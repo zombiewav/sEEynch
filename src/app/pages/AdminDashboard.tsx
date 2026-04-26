@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Link, useLocation } from "react-router";
+import React, { useState, useEffect } from "react";
+import { useNavigate, useLocation } from "react-router";
 import { 
   GraduationCap, 
   Bell, 
@@ -13,16 +13,23 @@ import {
   TrendingUp,
   Wallet,
   Receipt as ReceiptIcon,
-  Pencil,
-  X
+  X,
+  QrCode,
+  Copy,
+  Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { initialTasks, initialReceipts, budgetData, eventData, students, Task, TaskStatus } from "../data/mockData";
+import { initialTasks, initialReceipts, budgetData, eventData, students, Task, TaskStatus, Receipt } from "../data/mockData";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { useAuth } from "../contexts/AuthContext";
 
 export function AdminDashboard() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const location = useLocation();
-  const adminName = location.state?.name || "Officer";
+  const state = location.state as { name?: string; position?: string } | null;
+  const adminName = user?.fullName || state?.name || "Officer";
+  const adminPosition = user?.officerPosition || state?.position || "Class Officer";
   const adminInitials = adminName
     .split(" ")
     .map((w: string) => w[0])
@@ -30,8 +37,29 @@ export function AdminDashboard() {
     .toUpperCase()
     .slice(0, 2);
 
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const [receipts, setReceipts] = useState(initialReceipts);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const savedTasks = localStorage.getItem("sEEync_tasks");
+    return savedTasks ? JSON.parse(savedTasks) : initialTasks;
+  });
+  const [receipts, setReceipts] = useState(() => {
+    const saved = localStorage.getItem('sEEync_receipts');
+    return saved ? JSON.parse(saved) : initialReceipts;
+  });
+
+  useEffect(() => {
+    localStorage.setItem("sEEync_tasks", JSON.stringify(tasks));
+  }, [tasks]);
+
+  // Class Invite State
+  const inviteCode = "BSEE-1B-XYZ";
+  const [copied, setCopied] = useState(false);
+  const [showQrModal, setShowQrModal] = useState(false);
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(inviteCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   // Assign Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
@@ -64,6 +92,15 @@ export function AdminDashboard() {
       setTaskFormError("Please select a student and enter a task description.");
       return;
     }
+    if (taskForm.dueDate) {
+      const selectedDate = new Date(taskForm.dueDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Normalize to midnight for accurate day comparison
+      if (selectedDate < today) {
+        setTaskFormError("Due date cannot be set in the past.");
+        return;
+      }
+    }
     const materials = taskForm.materialsInput
       .split(",")
       .map(m => m.trim())
@@ -81,32 +118,31 @@ export function AdminDashboard() {
   };
 
   // Budget state
-  const [budget, setBudget] = useState({ ...budgetData });
-  const [showBudgetModal, setShowBudgetModal] = useState(false);
-  const [budgetForm, setBudgetForm] = useState({
-    goal: budgetData.goal.toString(),
-    collected: budgetData.collected.toString(),
-    expenses: budgetData.expenses.toString(),
-  });
+  const getBudget = () => {
+    const defaultContributions = [{ amountPaid: 100 }, { amountPaid: 50 }, { amountPaid: 0 }, { amountPaid: 100 }, { amountPaid: 20 }];
+    const defaultReceipts = [{ amount: 150 }, { amount: 50 }, { amount: 30 }];
+    const defaultMaterials = [{ price: 15, quantity: 2 }, { price: 50, quantity: 1 }, { price: 250, quantity: 1 }, { price: 85, quantity: 2 }];
 
-  const handleBudgetSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    setBudget({
-      goal: parseFloat(budgetForm.goal) || 0,
-      collected: parseFloat(budgetForm.collected) || 0,
-      expenses: parseFloat(budgetForm.expenses) || 0,
-    });
-    setShowBudgetModal(false);
+    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
+    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
+    const materialsData = JSON.parse(localStorage.getItem('sEEync_event_materials') || "null") || defaultMaterials;
+
+    return {
+      collected: contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0),
+      goal: materialsData.reduce((sum: number, m: any) => sum + ((m.price || 0) * (m.quantity || 0)), 0),
+      expenses: receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
+    };
   };
 
-  const openBudgetModal = () => {
-    setBudgetForm({
-      goal: budget.goal.toString(),
-      collected: budget.collected.toString(),
-      expenses: budget.expenses.toString(),
-    });
-    setShowBudgetModal(true);
-  };
+  const [budget, setBudget] = useState(getBudget);
+
+  useEffect(() => {
+    setBudget(getBudget());
+    const savedTasks = localStorage.getItem("sEEync_tasks");
+    if (savedTasks) setTasks(JSON.parse(savedTasks));
+    const savedReceipts = localStorage.getItem('sEEync_receipts');
+    if (savedReceipts) setReceipts(JSON.parse(savedReceipts));
+  }, [location]);
 
   // Mock calculations
   const overdueCount = tasks.filter(t => t.status !== "Done" && t.dueDate && new Date(t.dueDate) < new Date()).length;
@@ -118,8 +154,70 @@ export function AdminDashboard() {
     setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
   };
 
+  const handleBudgetSave = (e: React.FormEvent) => {
+    e.preventDefault();
+    const goal = parseFloat(budgetForm.goal) || 0;
+    const collected = parseFloat(budgetForm.collected) || 0;
+    const expenses = parseFloat(budgetForm.expenses) || 0;
+    
+    // Save to localStorage
+    localStorage.setItem('sEEync_budget_goal', goal.toString());
+    localStorage.setItem('sEEync_budget_collected', collected.toString());
+    localStorage.setItem('sEEync_actual_expenses', expenses.toString());
+    
+    // Update budget state (though it's read-only, this would normally update it)
+    // For now, just close the modal
+    setShowBudgetModal(false);
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 transition-colors">
+
+      {/* QR Code Modal */}
+      <AnimatePresence>
+        {showQrModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => setShowQrModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 10 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm p-8 text-center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-end mb-2">
+                <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+                  <X size={20} />
+                </button>
+              </div>
+              <h3 className="text-2xl font-bold text-blue-900 dark:text-blue-400 mb-2">Class QR Code</h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Scan to join {inviteCode}</p>
+              
+              <div className="w-48 h-48 mx-auto border-2 border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center mb-6 bg-white overflow-hidden shadow-sm">
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${inviteCode}&color=0f172a`} 
+                  alt="Real Class QR Code" 
+                  className="w-40 h-40"
+                />
+              </div>
+              
+              <button
+                onClick={handleCopyCode}
+                className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors shadow-md shadow-orange-500/20 flex items-center justify-center gap-2"
+              >
+                {copied ? <Check size={18} /> : <Copy size={18} />}
+                {copied ? "Copied!" : "Copy Invite Code"}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Assign Task Modal */}
       <AnimatePresence>
@@ -253,6 +351,7 @@ export function AdminDashboard() {
                   </label>
                   <input
                     type="date"
+                    min={new Date().toISOString().split("T")[0]}
                     value={taskForm.dueDate}
                     onChange={(e) => setTaskForm({ ...taskForm, dueDate: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400 text-slate-900 dark:text-slate-100 transition-colors"
@@ -378,7 +477,7 @@ export function AdminDashboard() {
                   <div className="flex justify-between text-slate-600 dark:text-slate-400">
                     <span>Remaining Balance</span>
                     <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      ₱{((parseFloat(budgetForm.collected) || 0) - (parseFloat(budgetForm.expenses) || 0)).toLocaleString()}
+                      ₱{Math.max(0, ((parseFloat(budgetForm.collected) || 0) - (parseFloat(budgetForm.expenses) || 0))).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between text-slate-600 dark:text-slate-400">
@@ -437,8 +536,11 @@ export function AdminDashboard() {
                   <span className="text-white text-sm font-extrabold leading-none">{adminInitials}</span>
                 </div>
                 <div className="hidden md:block text-sm">
-                  <p className="font-semibold text-blue-900 dark:text-blue-400 transition-colors">{adminName}</p>
-                  <Link to="/" className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 text-xs font-bold uppercase tracking-wider transition-colors">Log out</Link>
+                <p className="font-semibold text-blue-900 dark:text-blue-400 leading-tight transition-colors">{adminName}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1 transition-colors">{adminPosition}</p>
+                <button onClick={() => { logout(); navigate("/"); }} className="text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 text-[10px] font-bold uppercase tracking-wider transition-colors text-left">
+                  Log out
+                </button>
                 </div>
               </div>
             </div>
@@ -502,7 +604,7 @@ export function AdminDashboard() {
               </div>
               <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-2 overflow-hidden transition-colors">
                 <div 
-                  className="bg-orange-500 dark:bg-orange-600 h-full rounded-full transition-all duration-1000 ease-out"
+                  className="bg-blue-500 dark:bg-blue-600 h-full rounded-full transition-all duration-1000 ease-out"
                   style={{ width: `${tasks.length === 0 ? 0 : (tasks.filter(t => t.status === 'Done').length / tasks.length) * 100}%` }}
                 ></div>
               </div>
@@ -626,19 +728,40 @@ export function AdminDashboard() {
           {/* Sidebar (Budget & Receipts) */}
           <div className="space-y-6">
             
+            {/* Class Invite Widget */}
+            <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 transition-colors">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400 transition-colors">
+                  Class Invite
+                </h2>
+                <button
+                  onClick={() => setShowQrModal(true)}
+                  className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
+                  title="Show QR Code"
+                >
+                  <QrCode size={18} />
+                </button>
+              </div>
+              <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 transition-colors">
+                <span className="text-xl font-mono font-bold tracking-widest text-orange-600 dark:text-orange-400">
+                  {inviteCode}
+                </span>
+                <button
+                  onClick={handleCopyCode}
+                  className="p-2 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-500 transition-colors"
+                >
+                  {copied ? <Check size={18} className="text-emerald-500" /> : <Copy size={18} />}
+                </button>
+              </div>
+              {copied && <p className="text-xs text-emerald-500 mt-2 font-medium">Copied to clipboard!</p>}
+            </section>
+
             {/* Budget Tracker */}
             <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm p-6 transition-colors">
               <div className="flex items-start justify-between mb-1">
                 <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400 flex items-center gap-2 transition-colors">
                   Budget Tracker <span className="text-orange-600 dark:text-orange-400 font-bold text-xs px-2 py-0.5 bg-orange-50 dark:bg-orange-950 rounded-md uppercase tracking-wider transition-colors">Ambagan</span>
                 </h2>
-                <button
-                  onClick={openBudgetModal}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 hover:bg-orange-50 dark:hover:bg-orange-950 text-slate-600 dark:text-slate-300 hover:text-orange-600 dark:hover:text-orange-400 text-xs font-bold transition-colors border border-slate-200 dark:border-slate-600 hover:border-orange-200 dark:hover:border-orange-700"
-                >
-                  <Pencil size={13} />
-                  Edit
-                </button>
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 transition-colors">Financial overview and collections.</p>
 
@@ -655,7 +778,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="bg-emerald-50/50 dark:bg-emerald-950/20 rounded-xl p-4 border border-emerald-100 dark:border-emerald-900 transition-colors">
                     <p className="text-xs text-emerald-600/70 dark:text-emerald-400/70 font-bold uppercase tracking-wider mb-1 transition-colors">Remaining Balance</p>
-                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400 transition-colors">₱{remainingBalance.toLocaleString()}</p>
+                    <p className="text-xl font-bold text-emerald-700 dark:text-emerald-400 transition-colors">₱{Math.max(0, remainingBalance).toLocaleString()}</p>
                   </div>
                 </div>
 
@@ -666,7 +789,7 @@ export function AdminDashboard() {
                   </div>
                   <div className="w-full bg-slate-100 dark:bg-slate-700 rounded-full h-3 overflow-hidden transition-colors">
                     <div 
-                      className="bg-orange-500 dark:bg-orange-600 h-full rounded-full transition-all duration-1000 ease-out"
+                      className="bg-emerald-500 dark:bg-emerald-600 h-full rounded-full transition-all duration-1000 ease-out"
                       style={{ width: `${progressPercent}%` }}
                     ></div>
                   </div>
@@ -685,7 +808,7 @@ export function AdminDashboard() {
               </div>
 
               <div className="space-y-4 mb-6">
-                {receipts.map(receipt => (
+                {receipts.map((receipt: Receipt) => (
                   <div key={receipt.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-600">
                     {receipt.imageUrl && (
                       <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-700 overflow-hidden shrink-0 ring-1 ring-slate-200 dark:ring-slate-600 transition-colors">

@@ -1,18 +1,33 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router";
-import { ChevronRight, LogIn, ArrowLeft } from "lucide-react";
+import { ChevronRight, LogIn, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { motion } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { useAuth, type User } from "../contexts/AuthContext";
 
 export function AdminLogin() {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [adminUser, setAdminUser] = useState("");
   const [adminPass, setAdminPass] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     if (adminUser && adminPass) {
-      navigate("/admin", { state: { name: adminUser } });
+      const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
+      const user = storedUsers.find(
+        (u: Record<string, any>) => u.email === adminUser && u.password === adminPass && u.role === "officer"
+      );
+
+      if (user) {
+        login(user as User);
+        navigate("/admin", { state: { name: user.fullName, position: user.officerPosition } });
+      } else {
+        setError("Invalid email or password. Please try again.");
+      }
     }
   };
 
@@ -48,11 +63,11 @@ export function AdminLogin() {
           <form onSubmit={handleAdminLogin} className="space-y-5">
             <div className="space-y-2">
               <label htmlFor="adminUser" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 transition-colors">
-                Username
+                Email
               </label>
               <input
                 id="adminUser"
-                type="text"
+                type="email"
                 value={adminUser}
                 onChange={(e) => setAdminUser(e.target.value)}
                 placeholder="admin@class2026.edu"
@@ -69,16 +84,31 @@ export function AdminLogin() {
                   Forgot Password?
                 </a>
               </div>
-              <input
-                id="adminPass"
-                type="password"
-                value={adminPass}
-                onChange={(e) => setAdminPass(e.target.value)}
-                placeholder="••••••••"
-                className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400 focus:bg-white dark:focus:bg-slate-800 transition-all min-h-[48px] text-slate-900 dark:text-slate-100"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="adminPass"
+                  type={showPassword ? "text" : "password"}
+                  value={adminPass}
+                  onChange={(e) => setAdminPass(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full px-4 py-3 pr-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400 focus:bg-white dark:focus:bg-slate-800 transition-all min-h-[48px] text-slate-900 dark:text-slate-100"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
+
+          {error && (
+            <p className="text-sm font-medium text-red-500 dark:text-red-400">{error}</p>
+          )}
+
             <div className="pt-4">
               <button
                 type="submit"
@@ -87,6 +117,12 @@ export function AdminLogin() {
                 Login to Command Center
                 <ChevronRight size={20} />
               </button>
+            </div>
+            
+            <div className="text-center pt-2">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Don't have an officer account? <Link to="/signup" state={{ role: 'officer' }} className="font-bold text-blue-600 dark:text-blue-400 hover:text-blue-500 dark:hover:text-blue-300 transition-colors">Sign Up</Link>
+              </p>
             </div>
           </form>
         </div>

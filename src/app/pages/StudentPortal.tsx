@@ -1,16 +1,26 @@
 import React, { useState } from "react";
-import { Link, useLocation } from "react-router";
-import { GraduationCap, LogOut, CheckCircle2, Clock, CalendarDays, Receipt as ReceiptIcon, ChevronRight, X } from "lucide-react";
+import { useNavigate, useLocation, Link } from "react-router";
+import { GraduationCap, LogOut, CheckCircle2, Clock, CalendarDays, Receipt as ReceiptIcon, ChevronRight, X, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { initialTasks, initialReceipts, budgetData, eventData, Task } from "../data/mockData";
+import { initialTasks, initialReceipts, budgetData, eventData, Task, Receipt } from "../data/mockData";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { useAuth } from "../contexts/AuthContext";
 
 export function StudentPortal() {
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
   const location = useLocation();
-  const studentName = location.state?.name || "Juan de la Cruz";
+  const state = location.state as { name?: string } | null;
+  const studentName = user?.fullName || state?.name || "Juan de la Cruz";
   
-  const [tasks] = useState(initialTasks);
-  const [receipts] = useState(initialReceipts);
+  const [tasks, setTasks] = useState<Task[]>(() => {
+    const savedTasks = localStorage.getItem("sEEync_tasks");
+    return savedTasks ? JSON.parse(savedTasks) : initialTasks;
+  });
+  const [receipts, setReceipts] = useState(() => {
+    const saved = localStorage.getItem('sEEync_receipts');
+    return saved ? JSON.parse(saved) : initialReceipts;
+  });
   const [lightboxImg, setLightboxImg] = useState<string | null>(null);
 
   // Find student's task (mock matching logic)
@@ -23,7 +33,55 @@ export function StudentPortal() {
   };
 
   const progressPercent = tasks.length === 0 ? 0 : Math.round((tasks.filter(t => t.status === 'Done').length / tasks.length) * 100);
-  const remainingBalance = budgetData.collected - budgetData.expenses;
+  
+  const getBudget = () => {
+    const defaultContributions = [{ amountPaid: 100 }, { amountPaid: 50 }, { amountPaid: 0 }, { amountPaid: 100 }, { amountPaid: 20 }];
+    const defaultReceipts = [{ amount: 150 }, { amount: 50 }, { amount: 30 }];
+    const defaultMaterials = [{ price: 15, quantity: 2 }, { price: 50, quantity: 1 }, { price: 250, quantity: 1 }, { price: 85, quantity: 2 }];
+
+    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
+    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
+    const materialsData = JSON.parse(localStorage.getItem('sEEync_event_materials') || "null") || defaultMaterials;
+
+    return {
+      collected: contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0),
+      goal: materialsData.reduce((sum: number, m: any) => sum + ((m.price || 0) * (m.quantity || 0)), 0),
+      expenses: receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
+    };
+  };
+
+  const [budget, setBudget] = useState(getBudget);
+
+  useEffect(() => {
+    setBudget(getBudget());
+    const savedTasks = localStorage.getItem("sEEync_tasks");
+    if (savedTasks) setTasks(JSON.parse(savedTasks));
+    const savedReceipts = localStorage.getItem('sEEync_receipts');
+    if (savedReceipts) setReceipts(JSON.parse(savedReceipts));
+  }, [location]);
+
+  const handleStatusChange = (taskId: string, newStatus: 'Pending' | 'In Progress' | 'Done') => {
+    if (taskId === "t-default") return;
+    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
+    setTasks(updatedTasks);
+    localStorage.setItem("sEEync_tasks", JSON.stringify(updatedTasks));
+
+    const task = updatedTasks.find(t => t.id === taskId);
+    if (task) {
+      const activity = {
+        id: `act-${Date.now()}`,
+        type: 'task',
+        message: `updated their task "${task.taskDesc}" to ${newStatus}.`,
+        actor: studentName,
+        timestamp: Date.now(),
+      };
+      const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
+      log.unshift(activity);
+      localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
+    }
+  };
+
+  const remainingBalance = budget.collected - budget.expenses;
   const daysUntilEvent = Math.floor((new Date(eventData.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
 
   return (
@@ -70,10 +128,14 @@ export function StudentPortal() {
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
-              <Link to="/" className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg">
+              <Link to="/deadlines" state={{ name: studentName }} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg">
+                <CalendarDays size={16} />
+                <span className="hidden sm:inline">Deadlines</span>
+              </Link>
+              <button onClick={() => { logout(); navigate("/"); }} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-orange-600 dark:hover:text-orange-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-orange-50 dark:hover:bg-orange-950 rounded-lg">
                 <LogOut size={16} />
                 <span className="hidden sm:inline">Logout</span>
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -125,13 +187,23 @@ export function StudentPortal() {
               </h3>
               <p className="text-blue-100 text-sm mt-1 font-medium">What you need to do for the class.</p>
             </div>
-            <div className={`relative z-10 px-4 py-2 rounded-xl text-sm font-bold shadow-sm flex items-center gap-2
-              ${myTask.status === 'Done' ? 'bg-emerald-500 text-white' : 
-                myTask.status === 'In Progress' ? 'bg-amber-400 text-amber-900' : 
-                'bg-white/20 text-white backdrop-blur-sm'}`}>
-              {myTask.status === 'Done' && <CheckCircle2 size={16} />}
-              {myTask.status === 'In Progress' && <Clock size={16} />}
-              {myTask.status}
+            <div className="relative z-10 flex items-center gap-2">
+              <select 
+                value={myTask.status}
+                onChange={(e) => handleStatusChange(myTask.id, e.target.value as any)}
+                disabled={myTask.id === "t-default"}
+                className={`appearance-none pl-4 pr-10 py-2 rounded-xl text-sm font-bold shadow-sm cursor-pointer outline-none transition-colors
+                  ${myTask.status === 'Done' ? 'bg-emerald-500 text-white' : 
+                    myTask.status === 'In Progress' ? 'bg-amber-400 text-amber-900' : 
+                    'bg-white/20 text-white backdrop-blur-sm hover:bg-white/30'}`}
+              >
+                <option value="Pending" className="text-slate-900">Pending</option>
+                <option value="In Progress" className="text-slate-900">In Progress</option>
+                <option value="Done" className="text-slate-900">Done</option>
+              </select>
+              <div className={`pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 ${myTask.status === 'In Progress' ? 'text-amber-900' : 'text-white'}`}>
+                <ChevronDown size={16} strokeWidth={3} />
+              </div>
             </div>
           </div>
           
@@ -179,15 +251,15 @@ export function StudentPortal() {
           <div className="p-6 md:p-8 bg-slate-50 dark:bg-slate-900 border-b border-slate-100 dark:border-slate-700 grid grid-cols-1 md:grid-cols-3 gap-4 transition-colors">
             <div className="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm md:col-span-1 transition-colors">
               <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1 transition-colors">Total Collected</p>
-              <p className="text-2xl font-extrabold text-blue-700 dark:text-blue-400 transition-colors">₱{budgetData.collected.toLocaleString()}</p>
+              <p className="text-2xl font-extrabold text-blue-700 dark:text-blue-400 transition-colors">₱{budget.collected.toLocaleString()}</p>
             </div>
             <div className="bg-red-50 dark:bg-red-950/20 p-5 rounded-2xl border border-red-100 dark:border-red-900 shadow-sm transition-colors">
               <p className="text-xs font-bold text-red-600/70 dark:text-red-400/70 uppercase tracking-wider mb-1 transition-colors">Total Expenses</p>
-              <p className="text-2xl font-extrabold text-red-700 dark:text-red-400 transition-colors">₱{budgetData.expenses.toLocaleString()}</p>
+            <p className="text-2xl font-extrabold text-red-700 dark:text-red-400 transition-colors">₱{budget.expenses.toLocaleString()}</p>
             </div>
             <div className="bg-emerald-50 dark:bg-emerald-950/20 p-5 rounded-2xl border border-emerald-100 dark:border-emerald-900 shadow-sm transition-colors">
               <p className="text-xs font-bold text-emerald-600/70 dark:text-emerald-400/70 uppercase tracking-wider mb-1 transition-colors">Remaining</p>
-              <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 transition-colors">₱{remainingBalance.toLocaleString()}</p>
+              <p className="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 transition-colors">₱{Math.max(0, remainingBalance).toLocaleString()}</p>
             </div>
           </div>
 
@@ -196,7 +268,7 @@ export function StudentPortal() {
               Official Receipts Gallery
             </h4>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              {receipts.filter(r => r.imageUrl).map(receipt => (
+              {receipts.filter((r: Receipt) => r.imageUrl).map((receipt: Receipt) => (
                 <div key={receipt.id} className="group relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-700 aspect-square shadow-sm cursor-pointer hover:ring-4 hover:ring-orange-500 dark:hover:ring-orange-600 transition-all"
                   onClick={() => setLightboxImg(receipt.imageUrl)}
                 >
@@ -208,7 +280,7 @@ export function StudentPortal() {
                 </div>
               ))}
             </div>
-            {receipts.filter(r => r.imageUrl).length === 0 && (
+            {receipts.filter((r: Receipt) => r.imageUrl).length === 0 && (
               <div className="text-center py-10 bg-slate-50 dark:bg-slate-900 rounded-2xl border border-dashed border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 transition-colors">
                 <ReceiptIcon size={32} className="mx-auto text-slate-300 dark:text-slate-600 mb-2 transition-colors" />
                 <p>No receipts uploaded yet.</p>

@@ -1,18 +1,33 @@
 import React, { useState } from "react";
 import { useNavigate, Link } from "react-router";
-import { GraduationCap, ArrowRight, ShieldCheck } from "lucide-react";
+import { GraduationCap, ArrowRight, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { useAuth, type User } from "../contexts/AuthContext";
 
 export function Landing() {
   const navigate = useNavigate();
-  const [studentName, setStudentName] = useState("");
+  const { login } = useAuth();
+  const [studentEmail, setStudentEmail] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState("");
 
   const handleStudentLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    if (studentName.trim() && studentPassword.trim()) {
-      navigate("/student", { state: { name: studentName } });
+    setError("");
+    if (studentEmail.trim() && studentPassword.trim()) {
+      const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
+      const user = storedUsers.find(
+        (u: Record<string, any>) => u.email === studentEmail && u.password === studentPassword && u.role === "student"
+      );
+
+      if (user) {
+        login(user as User);
+        navigate("/student", { state: { name: user.fullName } });
+      } else {
+        setError("Invalid email or password. Please try again.");
+      }
     }
   };
 
@@ -54,15 +69,15 @@ export function Landing() {
 
           <form onSubmit={handleStudentLogin} className="space-y-6">
             <div className="space-y-2">
-              <label htmlFor="studentName" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1 transition-colors">
-                Your Full Name
+              <label htmlFor="studentEmail" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1 transition-colors">
+                Email
               </label>
               <input
-                id="studentName"
-                type="text"
-                value={studentName}
-                onChange={(e) => setStudentName(e.target.value)}
-                placeholder="Juan de la Cruz"
+                id="studentEmail"
+                type="email"
+                value={studentEmail}
+                onChange={(e) => setStudentEmail(e.target.value)}
+                placeholder="you@student.edu"
                 className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:bg-white dark:focus:bg-slate-800 transition-all text-lg min-h-[56px] shadow-sm text-slate-900 dark:text-slate-100"
                 required
               />
@@ -71,16 +86,31 @@ export function Landing() {
               <label htmlFor="studentPassword" className="block text-sm font-semibold text-slate-700 dark:text-slate-300 ml-1 transition-colors">
                 Password
               </label>
-              <input
-                id="studentPassword"
-                type="password"
-                value={studentPassword}
-                onChange={(e) => setStudentPassword(e.target.value)}
-                placeholder="Enter your password"
-                className="w-full px-5 py-4 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:bg-white dark:focus:bg-slate-800 transition-all text-lg min-h-[56px] shadow-sm text-slate-900 dark:text-slate-100"
-                required
-              />
+              <div className="relative">
+                <input
+                  id="studentPassword"
+                  type={showPassword ? "text" : "password"}
+                  value={studentPassword}
+                  onChange={(e) => setStudentPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full px-5 py-4 pr-12 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 focus:bg-white dark:focus:bg-slate-800 transition-all text-lg min-h-[56px] shadow-sm text-slate-900 dark:text-slate-100"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 flex items-center pr-4 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                  tabIndex={-1}
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
+
+            {error && (
+              <p className="text-sm font-medium text-red-500 dark:text-red-400">{error}</p>
+            )}
+
             <button
               type="submit"
               className="w-full bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg min-h-[56px] shadow-md shadow-orange-500/20 dark:shadow-orange-600/20 hover:shadow-lg hover:-translate-y-0.5"
@@ -88,6 +118,12 @@ export function Landing() {
               Check My Tasks & Status
               <ArrowRight size={20} />
             </button>
+
+            <div className="text-center pt-2">
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Don't have an account? <Link to="/signup" state={{ role: 'student' }} className="font-bold text-orange-600 dark:text-orange-500 hover:text-orange-500 dark:hover:text-orange-400 transition-colors">Sign Up</Link>
+              </p>
+            </div>
           </form>
         </motion.div>
       </div>
