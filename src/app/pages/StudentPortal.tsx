@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
 import { GraduationCap, LogOut, CheckCircle2, Clock, CalendarDays, Receipt as ReceiptIcon, ChevronRight, X, ChevronDown } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
