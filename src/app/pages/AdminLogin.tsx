@@ -11,22 +11,31 @@ export function AdminLogin() {
   const [adminUser, setAdminUser] = useState("");
   const [adminPass, setAdminPass] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleAdminLogin = (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (adminUser && adminPass) {
-      const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
-      const user = storedUsers.find(
-        (u: Record<string, any>) => u.email === adminUser && u.password === adminPass && u.role === "officer"
-      );
+      setIsLoading(true);
+      try {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
+        const user = storedUsers.find(
+          (u: Record<string, any>) => u.email === adminUser && u.password === adminPass && u.role === "officer"
+        );
 
-      if (user) {
-        login(user as User);
-        navigate("/admin", { state: { name: user.fullName, position: user.officerPosition } });
-      } else {
-        setError("Invalid email or password. Please try again.");
+        if (user) {
+          login(user as User);
+          navigate("/admin", { state: { name: user.fullName, position: user.officerPosition } });
+        } else {
+          throw new Error("Invalid email or password. Please try again.");
+        }
+      } catch (err: any) {
+        setError(err.message || "Invalid email or password.");
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -112,9 +121,10 @@ export function AdminLogin() {
             <div className="pt-4">
               <button
                 type="submit"
-                className="w-full bg-blue-700 hover:bg-blue-800 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[56px] text-lg shadow-md shadow-blue-700/20 dark:shadow-blue-600/20"
+            disabled={isLoading}
+            className="w-full bg-blue-700 hover:bg-blue-800 disabled:opacity-70 dark:bg-blue-600 dark:hover:bg-blue-700 text-white font-semibold py-4 px-6 rounded-xl transition-colors flex items-center justify-center gap-2 min-h-[56px] text-lg shadow-md shadow-blue-700/20 dark:shadow-blue-600/20"
               >
-                Login to Command Center
+            {isLoading ? "Logging in..." : "Login to Command Center"}
                 <ChevronRight size={20} />
               </button>
             </div>

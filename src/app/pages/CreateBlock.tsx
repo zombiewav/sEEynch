@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
 import { 
-  BookOpen, Hash, Calendar, QrCode, Copy, Check, ArrowRight, 
+  BookOpen, Hash, Calendar, Copy, Check, ArrowRight, 
   Search, ShieldCheck, Plus, ArrowLeft, X 
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
@@ -264,16 +264,7 @@ export function CreateBlock() {
                     <Check size={32} strokeWidth={3} />
                   </div>
                   <h1 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-3 text-gray-900 dark:text-white">Class Space Created!</h1>
-                  <p className="text-gray-500 dark:text-slate-400 text-sm mb-8">Share this QR or text code with your classmates so they can request to join.</p>
-
-                  {/* Real QR Code API implementation */}
-                  <div className="w-48 h-48 mx-auto border-2 border-gray-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center mb-6 bg-white overflow-hidden shadow-sm">
-                    <img 
-                      src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${generatedCode}&color=0f172a`} 
-                      alt="Class QR Code" 
-                      className="w-40 h-40"
-                    />
-                  </div>
+                  <p className="text-gray-500 dark:text-slate-400 text-sm mb-8">Share this text code with your classmates so they can request to join.</p>
 
                   {/* Invite Code */}
                   <div className="mb-8">

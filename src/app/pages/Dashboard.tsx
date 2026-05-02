@@ -29,7 +29,10 @@ export default function Dashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const toggleTask = (id: string) => {
     setTasks(prev => {
-      const updated = prev.map(t => t.id === id ? { ...t, status: t.status === 'Done' ? 'Pending' : 'Done' as const } : t);
+      const updated = prev.map(t => {
+        const newStatus: 'Pending' | 'In Progress' | 'Done' = t.status === 'Done' ? 'Pending' : 'Done';
+        return t.id === id ? { ...t, status: newStatus } : t;
+      });
       localStorage.setItem("sEEync_tasks", JSON.stringify(updated));
       return updated;
     });
@@ -42,11 +45,21 @@ export default function Dashboard() {
 
   useEffect(() => {
     // This effect will re-run every time the user navigates to the dashboard, ensuring data is fresh.
-    const defaultContributions = [{ status: 'Paid', amountPaid: 100 }, { status: 'Partially Paid', amountPaid: 50 }, { status: 'Unpaid', amountPaid: 0 }, { status: 'Paid', amountPaid: 100 }, { status: 'Partially Paid', amountPaid: 20 }];
-    const defaultReceipts = [{ amount: 150 }, { amount: 50 }, { amount: 30 }];
+    const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
     
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
+    const defaultContributions: any[] = [];
+    const defaultReceipts: any[] = [];
+    
+    let contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
+    let receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
+
+    // Filter out dummy data
+    contributions = contributions.filter((c: any) => !isDummyName(c.name));
+    receiptsData = receiptsData.filter((r: any) => !isDummyName(r.uploaderName));
+    
+    // Update localStorage with cleaned data
+    localStorage.setItem('sEEync_contributions', JSON.stringify(contributions));
+    localStorage.setItem('sEEync_receipts', JSON.stringify(receiptsData));
 
     const newCollected = contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
     const newExpenses = receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
@@ -58,13 +71,7 @@ export default function Dashboard() {
     const savedActivities = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
     setActivities(savedActivities);
 
-    const defaultTasks: Task[] = [
-      { id: '1', studentName: 'Juan de la Cruz', taskDesc: 'Buy Cartolina and Art Materials', status: 'In Progress', dueDate: '2026-04-20' },
-      { id: '2', studentName: 'Maria Clara', taskDesc: 'Collect Ambagan from Blockmates', status: 'Pending', dueDate: '2026-04-22' },
-      { id: '3', studentName: 'Jose Rizal', taskDesc: 'Ask permission from Adviser for Classroom use', status: 'Done', dueDate: '2026-04-15' },
-      { id: '4', studentName: 'Andres Bonifacio', taskDesc: 'Borrow Speaker from Student Council', status: 'Pending', dueDate: '2026-04-25' },
-      { id: '5', studentName: 'Gabriela Silang', taskDesc: 'Buy Softdrinks and Ice', status: 'Pending', dueDate: '2026-04-17' }
-    ];
+    const defaultTasks: Task[] = [];
     const savedTasks = JSON.parse(localStorage.getItem('sEEync_tasks') || "null") || defaultTasks;
     setTasks(savedTasks);
   }, [location]);

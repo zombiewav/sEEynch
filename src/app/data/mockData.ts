@@ -23,21 +23,9 @@ export interface Receipt {
   imageUrl: string;
 }
 
-export const students: Student[] = [
-  { id: "s1", name: "test1" },
-  { id: "s2", name: "test2" },
-  { id: "s3", name: "test3" },
-  { id: "s4", name: "test4" },
-  { id: "s5", name: "test5" },
-];
+export const students: Student[] = [];
 
-export const initialTasks: Task[] = [
-  { id: "t1", studentName: "test1", taskDesc: "Book Venue", status: "Done", materials: ["Contract", "Downpayment Receipt"] },
-  { id: "t2", studentName: "test2", taskDesc: "Buy Decorations", status: "In Progress", materials: ["Balloons", "Banners"] },
-  { id: "t3", studentName: "test3", taskDesc: "Send Invitations", status: "Pending", materials: ["Envelopes", "Stamps"] },
-  { id: "t4", studentName: "test4", taskDesc: "Order Food", status: "Pending", materials: ["Menu List"] },
-  { id: "t5", studentName: "test5", taskDesc: "Hire Photographer", status: "In Progress", materials: [] },
-];
+export const initialTasks: Task[] = [];
 
 export const initialReceipts: Receipt[] = [];
 

@@ -12,19 +12,30 @@ interface Contribution {
   requiredAmount: number;
 }
 
-const mockContributions: Contribution[] = [
-  { id: '1', name: 'Juan de la Cruz', status: 'Paid', amountPaid: 100, requiredAmount: 100 },
-  { id: '2', name: 'Maria Clara', status: 'Partially Paid', amountPaid: 50, requiredAmount: 100 },
-  { id: '3', name: 'Jose Rizal', status: 'Unpaid', amountPaid: 0, requiredAmount: 100 },
-  { id: '4', name: 'Andres Bonifacio', status: 'Paid', amountPaid: 100, requiredAmount: 100 },
-  { id: '5', name: 'Gabriela Silang', status: 'Partially Paid', amountPaid: 20, requiredAmount: 100 },
-];
+const mockContributions: Contribution[] = [];
+
+const clearDummyData = () => {
+  // Clean dummy contributions
+  const saved = localStorage.getItem('sEEync_contributions');
+  if (saved) {
+    try {
+      const contribs = JSON.parse(saved) as Contribution[];
+      const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
+      const filtered = contribs.filter(c => !isDummyName(c.name));
+      if (filtered.length !== contribs.length) {
+        localStorage.setItem('sEEync_contributions', JSON.stringify(filtered));
+      }
+    } catch {}
+  }
+};
 
 export default function AmbaganTracker() {
   const { user } = useAuth();
+  useEffect(() => {
+    clearDummyData();
+  }, []);
   const [contributions, setContributions] = useState<Contribution[]>(() => {
-    const saved = localStorage.getItem('sEEync_contributions');
-    return saved ? JSON.parse(saved) : mockContributions;
+    return [];
   });
 
   useEffect(() => {
@@ -36,15 +47,13 @@ export default function AmbaganTracker() {
   }, [contributions]);
 
   const getExpectedExpenses = () => {
-    const defaultMaterials = [{ price: 15, quantity: 2 }, { price: 50, quantity: 1 }, { price: 250, quantity: 1 }, { price: 85, quantity: 2 }];
-    const materialsData = JSON.parse(localStorage.getItem('sEEync_event_materials') || "null") || defaultMaterials;
-    return materialsData.reduce((sum: number, m: any) => sum + ((m.price || 0) * (m.quantity || 0)), 0);
+    localStorage.removeItem('sEEync_event_materials');
+    return 0;
   };
   
   const getActualExpenses = () => {
-    const defaultReceipts = [{ amount: 150 }, { amount: 50 }, { amount: 30 }];
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
-    return receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
+    localStorage.removeItem('sEEync_receipts');
+    return 0;
   };
 
   const expectedExpenses = getExpectedExpenses();

@@ -8,7 +8,6 @@ import {
   BookOpen, 
   Hash, 
   Calendar, 
-  QrCode, 
   Copy, 
   Check, 
   ArrowRight,
@@ -218,11 +217,7 @@ export function OfficerOnboarding() {
                 <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="bg-slate-800 rounded-[2rem] shadow-2xl p-8 md:p-10 border border-slate-700 text-center">
                   <div className="w-16 h-16 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6"><Check size={32} strokeWidth={3} /></div>
                   <h2 className="text-2xl md:text-3xl font-extrabold tracking-tight mb-3">Class Space Created!</h2>
-                  <p className="text-slate-400 text-sm mb-8">Share this QR or text code with your classmates.</p>
-                  <div className="w-48 h-48 mx-auto border-2 border-dashed border-slate-500 rounded-2xl flex flex-col items-center justify-center text-slate-400 mb-8 bg-slate-700/50">
-                    <QrCode size={64} className="mb-2 opacity-50" />
-                    <span className="text-xs font-bold uppercase tracking-widest">Mock QR Code</span>
-                  </div>
+                  <p className="text-slate-400 text-sm mb-8">Share this text code with your classmates.</p>
                   <div className="mb-8">
                     <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Class Invite Code</p>
                     <div className="flex items-center justify-between bg-slate-900 border border-slate-700 rounded-xl p-4">

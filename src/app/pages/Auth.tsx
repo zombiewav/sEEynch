@@ -1,10 +1,8 @@
 import React, { useState, useRef } from "react";
-import { Camera, Mail, Lock, User, Hash, GraduationCap, ShieldCheck } from "lucide-react";
+import { Mail, Lock, User, Hash, GraduationCap, ShieldCheck } from "lucide-react";
 
 export function Auth() {
   const [isLogin, setIsLogin] = useState(true);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -17,14 +15,6 @@ export function Auth() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setPreviewImage(imageUrl);
-    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -51,31 +41,6 @@ export function Auth() {
 
         <form onSubmit={handleSubmit} className="space-y-5">
           
-          {/* SIGN UP ONLY: Profile Picture */}
-          {!isLogin && (
-            <div className="flex flex-col items-center justify-center mb-6">
-              <div
-                className="relative w-24 h-24 rounded-full bg-slate-900 border-2 border-dashed border-slate-600 flex items-center justify-center cursor-pointer hover:border-orange-500 transition-all overflow-hidden group"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                {previewImage ? (
-                  <img src={previewImage} alt="Profile Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <Camera className="text-slate-500 group-hover:text-orange-500 transition-colors" size={28} />
-                )}
-                {/* Hidden File Input */}
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  onChange={handleImageUpload}
-                  accept="image/*"
-                  className="hidden"
-                />
-              </div>
-              <p className="text-xs text-slate-500 mt-3 font-medium">Upload Profile Picture</p>
-            </div>
-          )}
-
           {/* SIGN UP ONLY: Full Name & Student ID */}
           {!isLogin && (
             <>
@@ -155,6 +120,7 @@ export function Auth() {
                 value={formData.password}
                 onChange={handleInputChange}
                 placeholder="••••••••"
+                minLength={8}
                 className="w-full pl-11 pr-4 py-3.5 bg-slate-900 border border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500 transition-all text-white placeholder-slate-600"
                 required
               />

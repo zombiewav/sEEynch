@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { User, Shield, Search, Plus, QrCode, Copy, Check, X } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { User, Shield, Search, Plus, Copy, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 interface Member {
@@ -11,17 +11,33 @@ interface Member {
   avatar: string; // URL or initials
 }
 
-const mockMembers: Member[] = [
-  { id: '1', name: 'Juan de la Cruz', studentId: '2023-0001', role: 'Officer', position: 'President', avatar: 'JD' },
-  { id: '2', name: 'Maria Clara', studentId: '2023-0002', role: 'Student', avatar: 'MC' },
-  { id: '3', name: 'Jose Rizal', studentId: '2023-0003', role: 'Student', avatar: 'JR' },
-  { id: '4', name: 'Andres Bonifacio', studentId: '2023-0004', role: 'Officer', position: 'Treasurer', avatar: 'AB' },
-  { id: '5', name: 'Gabriela Silang', studentId: '2023-0005', role: 'Student', avatar: 'GS' },
-  { id: '6', name: 'Emilio Aguinaldo', studentId: '2023-0006', role: 'Student', avatar: 'EA' },
-];
+const mockMembers: Member[] = [];
 
 export default function Members() {
-  const [members, setMembers] = useState<Member[]>(mockMembers);
+  useEffect(() => {
+    // Clean dummy members but keep real ones
+    const saved = localStorage.getItem('sEEync_members');
+    if (saved) {
+      try {
+        const members = JSON.parse(saved) as Member[];
+        const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
+        const filtered = members.filter(m => !isDummyName(m.name));
+        if (filtered.length !== members.length) {
+          localStorage.setItem('sEEync_members', JSON.stringify(filtered));
+        }
+      } catch {}
+    }
+  }, []);
+  
+  const [members, setMembers] = useState<Member[]>(() => {
+    const saved = localStorage.getItem('sEEync_members');
+    return saved ? JSON.parse(saved) : mockMembers;
+  });
+  
+  useEffect(() => {
+    localStorage.setItem('sEEync_members', JSON.stringify(members));
+  }, [members]);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -78,15 +94,7 @@ export default function Members() {
                 </button>
               </div>
               <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">Class Invite Code</h3>
-              <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">Share this with new students to let them join.</p>
-              
-              <div className="w-48 h-48 mx-auto border-2 border-gray-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center mb-6 bg-white overflow-hidden shadow-sm">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${inviteCode}&color=0f172a`} 
-                  alt="Class QR Code" 
-                  className="w-40 h-40"
-                />
-              </div>
+              <p className="text-sm text-gray-500 dark:text-slate-400 mb-6">Share this code with new students to let them join.</p>
               
               <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 shadow-sm">
                 <span className="text-2xl font-mono font-bold tracking-widest text-orange-600 dark:text-orange-500">

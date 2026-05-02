@@ -15,19 +15,8 @@ interface MaterialItem {
   quantity: number;
 }
 
-const mockTodos: TodoItem[] = [
-  { id: "1", text: "Finalize party theme and food menu", isDone: true },
-  { id: "2", text: "Ask permission from adviser for classroom use", isDone: false },
-  { id: "3", text: "Collect ambagan for food and decors", isDone: false },
-  { id: "4", text: "Order bilao of pancit and softdrinks", isDone: false },
-];
-
-const mockMaterials: MaterialItem[] = [
-  { id: "m1", name: "Cartolina (Assorted)", price: 15, quantity: 2 },
-  { id: "m2", name: "Balloons (Pack of 10)", price: 50, quantity: 1 },
-  { id: "m3", name: "Pancit (Small Bilao)", price: 250, quantity: 1 },
-  { id: "m4", name: "Softdrinks (1.5L)", price: 85, quantity: 2 },
-];
+const mockTodos: TodoItem[] = [];
+const mockMaterials: MaterialItem[] = [];
 
 export default function EventDashboard() {
   const { user } = useAuth();
@@ -121,13 +110,13 @@ export default function EventDashboard() {
   const grandTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
   
   const getCollectedFunds = () => {
-    const defaultContributions = [{ amountPaid: 100 }, { amountPaid: 50 }, { amountPaid: 0 }, { amountPaid: 100 }, { amountPaid: 20 }];
+    const defaultContributions: any[] = [];
     const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
     return contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
   };
 
   const getActualExpenses = () => {
-    const defaultReceipts = [{ amount: 150 }, { amount: 50 }, { amount: 30 }];
+    const defaultReceipts: any[] = [];
     const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
     return receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
   };

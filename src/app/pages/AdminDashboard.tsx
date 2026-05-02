@@ -5,7 +5,6 @@ import {
   Bell, 
   Plus, 
   ChevronDown,
-  Upload,
   CalendarDays,
   AlertCircle,
   CheckCircle2,
@@ -14,16 +13,35 @@ import {
   Wallet,
   Receipt as ReceiptIcon,
   X,
-  QrCode,
   Copy,
   Check
 } from "lucide-react";
-import { motion, AnimatePresence } from "motion/react";
-import { initialTasks, initialReceipts, budgetData, eventData, students, Task, TaskStatus, Receipt } from "../data/mockData";
+import { motion, AnimatePresence } from "framer-motion";
+import { budgetData, eventData, Task, TaskStatus, Receipt } from "../data/mockData";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
 
+const isDummyTask = (task: Task) => task.studentName.toLowerCase().startsWith("test");
+
+const parseSavedTasks = (value: string | null): Task[] => {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value) as Task[];
+    const filtered = parsed.filter(task => !isDummyTask(task));
+    if (filtered.length !== parsed.length) {
+      localStorage.setItem("sEEync_tasks", JSON.stringify(filtered));
+    }
+    return filtered;
+  } catch {
+    return [];
+  }
+};
+
 export function AdminDashboard() {
+  // Clear stale expense data immediately
+  localStorage.removeItem('sEEync_event_materials');
+  localStorage.removeItem('sEEync_receipts');
+  
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -37,23 +55,19 @@ export function AdminDashboard() {
     .toUpperCase()
     .slice(0, 2);
 
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const savedTasks = localStorage.getItem("sEEync_tasks");
-    return savedTasks ? JSON.parse(savedTasks) : initialTasks;
-  });
+  const [tasks, setTasks] = useState<Task[]>(() => parseSavedTasks(localStorage.getItem("sEEync_tasks")));
   const [receipts, setReceipts] = useState(() => {
     const saved = localStorage.getItem('sEEync_receipts');
-    return saved ? JSON.parse(saved) : initialReceipts;
+    return saved ? JSON.parse(saved) : [];
   });
 
   useEffect(() => {
     localStorage.setItem("sEEync_tasks", JSON.stringify(tasks));
   }, [tasks]);
 
-  // Class Invite State
+// Class Invite State
   const inviteCode = "BSEE-1B-XYZ";
   const [copied, setCopied] = useState(false);
-  const [showQrModal, setShowQrModal] = useState(false);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(inviteCode);
@@ -63,6 +77,28 @@ export function AdminDashboard() {
 
   // Assign Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
+
+  const [members, setMembers] = useState<any[]>(() => {
+    const saved = localStorage.getItem('sEEync_members');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved) as any[];
+        const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
+        const filtered = parsed.filter(m => !isDummyName(m.name));
+        if (filtered.length !== parsed.length) {
+          localStorage.setItem('sEEync_members', JSON.stringify(filtered));
+        }
+        return filtered;
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  // Budget Modal state - FIX 1 & 2
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
+  const [budgetForm, setBudgetForm] = useState({ goal: '', collected: '', expenses: '' });
   const [taskForm, setTaskForm] = useState({
     studentName: "",
     taskDesc: "",
@@ -74,7 +110,7 @@ export function AdminDashboard() {
   const [showStudentDropdown, setShowStudentDropdown] = useState(false);
   const [taskFormError, setTaskFormError] = useState("");
 
-  const filteredStudents = students.filter(s =>
+  const filteredStudents = members.filter(s =>
     s.name.toLowerCase().includes(studentSearch.toLowerCase())
   );
 
@@ -119,9 +155,9 @@ export function AdminDashboard() {
 
   // Budget state
   const getBudget = () => {
-    const defaultContributions = [{ amountPaid: 100 }, { amountPaid: 50 }, { amountPaid: 0 }, { amountPaid: 100 }, { amountPaid: 20 }];
-    const defaultReceipts = [{ amount: 150 }, { amount: 50 }, { amount: 30 }];
-    const defaultMaterials = [{ price: 15, quantity: 2 }, { price: 50, quantity: 1 }, { price: 250, quantity: 1 }, { price: 85, quantity: 2 }];
+    const defaultContributions: any[] = [];
+    const defaultReceipts: any[] = [];
+    const defaultMaterials: any[] = [];
 
     const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
     const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
@@ -136,13 +172,20 @@ export function AdminDashboard() {
 
   const [budget, setBudget] = useState(getBudget);
 
+  // FIX 5: Type-safe localStorage parsing
   useEffect(() => {
     setBudget(getBudget());
-    const savedTasks = localStorage.getItem("sEEync_tasks");
-    if (savedTasks) setTasks(JSON.parse(savedTasks));
+    setTasks(parseSavedTasks(localStorage.getItem("sEEync_tasks")));
+    
     const savedReceipts = localStorage.getItem('sEEync_receipts');
-    if (savedReceipts) setReceipts(JSON.parse(savedReceipts));
-  }, [location]);
+    if (savedReceipts) {
+      try {
+        setReceipts(JSON.parse(savedReceipts) as Receipt[]);
+      } catch {
+        setReceipts([]);
+      }
+    }
+  }, []); // FIX 6: Remove location from deps as it's not used
 
   // Mock calculations
   const overdueCount = tasks.filter(t => t.status !== "Done" && t.dueDate && new Date(t.dueDate) < new Date()).length;
@@ -154,6 +197,7 @@ export function AdminDashboard() {
     setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
   };
 
+  // FIX 4: Complete handleBudgetSave implementation
   const handleBudgetSave = (e: React.FormEvent) => {
     e.preventDefault();
     const goal = parseFloat(budgetForm.goal) || 0;
@@ -165,59 +209,16 @@ export function AdminDashboard() {
     localStorage.setItem('sEEync_budget_collected', collected.toString());
     localStorage.setItem('sEEync_actual_expenses', expenses.toString());
     
-    // Update budget state (though it's read-only, this would normally update it)
-    // For now, just close the modal
+    // Update budget state
+    setBudget({ goal, collected, expenses });
     setShowBudgetModal(false);
+    
+    // Reset form
+    setBudgetForm({ goal: '', collected: '', expenses: '' });
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 transition-colors">
-
-      {/* QR Code Modal */}
-      <AnimatePresence>
-        {showQrModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setShowQrModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-sm p-8 text-center"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex justify-end mb-2">
-                <button onClick={() => setShowQrModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
-                  <X size={20} />
-                </button>
-              </div>
-              <h3 className="text-2xl font-bold text-blue-900 dark:text-blue-400 mb-2">Class QR Code</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">Scan to join {inviteCode}</p>
-              
-              <div className="w-48 h-48 mx-auto border-2 border-slate-200 dark:border-slate-700 rounded-2xl flex flex-col items-center justify-center mb-6 bg-white overflow-hidden shadow-sm">
-                <img 
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${inviteCode}&color=0f172a`} 
-                  alt="Real Class QR Code" 
-                  className="w-40 h-40"
-                />
-              </div>
-              
-              <button
-                onClick={handleCopyCode}
-                className="w-full py-3 px-4 bg-orange-500 hover:bg-orange-600 text-white font-bold rounded-xl transition-colors shadow-md shadow-orange-500/20 flex items-center justify-center gap-2"
-              >
-                {copied ? <Check size={18} /> : <Copy size={18} />}
-                {copied ? "Copied!" : "Copy Invite Code"}
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       {/* Assign Task Modal */}
       <AnimatePresence>
@@ -734,13 +735,6 @@ export function AdminDashboard() {
                 <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400 transition-colors">
                   Class Invite
                 </h2>
-                <button
-                  onClick={() => setShowQrModal(true)}
-                  className="p-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 rounded-lg transition-colors"
-                  title="Show QR Code"
-                >
-                  <QrCode size={18} />
-                </button>
               </div>
               <div className="flex items-center justify-between bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl p-3 transition-colors">
                 <span className="text-xl font-mono font-bold tracking-widest text-orange-600 dark:text-orange-400">
@@ -825,11 +819,6 @@ export function AdminDashboard() {
                   </div>
                 ))}
               </div>
-
-              <button className="w-full bg-white dark:bg-slate-900 hover:bg-orange-50 dark:hover:bg-orange-950 text-orange-600 dark:text-orange-400 border border-orange-200 dark:border-orange-700 hover:border-orange-300 dark:hover:border-orange-600 font-semibold py-3 px-4 rounded-xl transition-all flex items-center justify-center gap-2 min-h-[48px] text-sm shadow-sm shadow-orange-100 dark:shadow-orange-900/20">
-                <Upload size={18} />
-                <span>Upload Receipt</span>
-              </button>
             </section>
 
           </div>

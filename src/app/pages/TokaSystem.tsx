@@ -12,13 +12,7 @@ interface Task {
   dueDate: string;
 }
 
-const mockTasks: Task[] = [
-  { id: '1', studentName: 'Juan de la Cruz', taskDesc: 'Buy Cartolina and Art Materials', status: 'In Progress', dueDate: '2026-04-20' },
-  { id: '2', studentName: 'Maria Clara', taskDesc: 'Collect Ambagan from Blockmates', status: 'Pending', dueDate: '2026-04-22' },
-  { id: '3', studentName: 'Jose Rizal', taskDesc: 'Ask permission from Adviser for Classroom use', status: 'Done', dueDate: '2026-04-15' },
-  { id: '4', studentName: 'Andres Bonifacio', taskDesc: 'Borrow Speaker from Student Council', status: 'Pending', dueDate: '2026-04-25' },
-  { id: '5', studentName: 'Gabriela Silang', taskDesc: 'Buy Softdrinks and Ice', status: 'Pending', dueDate: '2026-04-17' }, // Overdue task
-];
+const mockTasks: Task[] = [];
 
 export default function TokaSystem() {
   const { user } = useAuth();

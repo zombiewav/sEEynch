@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate, useLocation } from "react-router";
-import { Hash, ArrowRight, QrCode, X, Camera, GraduationCap, CheckCircle2 } from "lucide-react";
+import { Hash, ArrowRight, GraduationCap, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,7 +13,6 @@ export function StudentJoin() {
   const studentName = user?.fullName || state?.name || "Student";
   
   const [inviteCode, setInviteCode] = useState("");
-  const [isScanning, setIsScanning] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -24,11 +23,6 @@ export function StudentJoin() {
         navigate("/student", { state: { name: studentName } });
       }, 2000); // Wait 2 seconds for the success animation before navigating
     }
-  };
-
-  const handleSimulateScan = () => {
-    setInviteCode("MOCK-CODE-123");
-    setIsScanning(false);
   };
 
   return (
@@ -95,23 +89,6 @@ export function StudentJoin() {
                 </div>
               </form>
 
-              {/* Divider */}
-              <div className="relative flex items-center py-6">
-                <div className="flex-grow border-t border-gray-200 dark:border-slate-700 transition-colors"></div>
-                <span className="flex-shrink-0 mx-4 text-gray-400 dark:text-slate-500 text-sm font-bold transition-colors">OR</span>
-                <div className="flex-grow border-t border-gray-200 dark:border-slate-700 transition-colors"></div>
-              </div>
-
-              {/* QR Button */}
-              <button 
-                type="button" 
-                onClick={() => setIsScanning(true)}
-                className="w-full py-4 px-6 bg-transparent hover:bg-gray-50 dark:hover:bg-slate-700 border-2 border-gray-300 dark:border-slate-500 text-gray-700 dark:text-slate-300 font-bold rounded-xl transition-colors flex justify-center items-center gap-2"
-              >
-                <QrCode size={20} />
-                Scan QR Code
-              </button>
-
             </motion.div>
           ) : (
             <motion.div 
@@ -136,54 +113,6 @@ export function StudentJoin() {
           )}
         </AnimatePresence>
       </div>
-
-      {/* QR Scanner Modal */}
-      <AnimatePresence>
-        {isScanning && (
-          <motion.div 
-            initial={{ opacity: 0 }} 
-            animate={{ opacity: 1 }} 
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setIsScanning(false)}
-          >
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }} 
-              animate={{ opacity: 1, scale: 1, y: 0 }} 
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl p-8 w-full max-w-md relative flex flex-col items-center text-center transition-colors"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Header & Close Button */}
-              <button 
-                onClick={() => setIsScanning(false)} 
-                className="absolute top-6 right-6 text-gray-400 dark:text-slate-400 hover:text-gray-600 dark:hover:text-white transition-colors p-2 rounded-full hover:bg-gray-100 dark:hover:bg-slate-700"
-              >
-                <X size={24} />
-              </button>
-              <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-2 transition-colors">Scan Class QR</h3>
-              <p className="text-gray-500 dark:text-slate-400 text-sm mb-8 transition-colors">Position the QR code inside the frame.</p>
-              
-              {/* The Viewfinder */}
-              <div className="w-64 h-64 border-4 border-dashed border-orange-500 rounded-3xl flex flex-col items-center justify-center relative overflow-hidden mb-8 bg-gray-50 dark:bg-slate-900 transition-colors shadow-inner">
-                {/* Subtle pulsing overlay to indicate "active" scanner */}
-                <div className="absolute inset-0 bg-orange-500/10 animate-pulse pointer-events-none"></div>
-                
-                <Camera size={48} className="text-orange-400 opacity-50 mb-4 relative z-10" />
-                <p className="text-xs font-bold text-orange-500/80 uppercase tracking-widest relative z-10">Searching...</p>
-              </div>
-
-              {/* Simulate Scan Button */}
-              <button 
-                onClick={handleSimulateScan} 
-                className="w-full py-4 px-6 bg-gray-100 hover:bg-gray-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-gray-800 dark:text-white font-bold rounded-xl transition-colors flex items-center justify-center gap-2 shadow-sm"
-              >
-                Simulate Scan (Test)
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }

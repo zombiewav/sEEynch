@@ -11,22 +11,31 @@ export function Landing() {
   const [studentEmail, setStudentEmail] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleStudentLogin = (e: React.FormEvent) => {
+  const handleStudentLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     if (studentEmail.trim() && studentPassword.trim()) {
-      const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
-      const user = storedUsers.find(
-        (u: Record<string, any>) => u.email === studentEmail && u.password === studentPassword && u.role === "student"
-      );
+      setIsLoading(true);
+      try {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
+        const user = storedUsers.find(
+          (u: Record<string, any>) => u.email === studentEmail && u.password === studentPassword && u.role === "student"
+        );
 
-      if (user) {
-        login(user as User);
-        navigate("/student", { state: { name: user.fullName } });
-      } else {
-        setError("Invalid email or password. Please try again.");
+        if (user) {
+          login(user as User);
+          navigate("/student", { state: { name: user.fullName } });
+        } else {
+          throw new Error("Invalid email or password. Please try again.");
+        }
+      } catch (err: any) {
+        setError(err.message || "Invalid email or password.");
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -113,9 +122,10 @@ export function Landing() {
 
             <button
               type="submit"
-              className="w-full bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg min-h-[56px] shadow-md shadow-orange-500/20 dark:shadow-orange-600/20 hover:shadow-lg hover:-translate-y-0.5"
+          disabled={isLoading}
+          className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg min-h-[56px] shadow-md shadow-orange-500/20 dark:shadow-orange-600/20 hover:shadow-lg hover:-translate-y-0.5"
             >
-              Check My Tasks & Status
+          {isLoading ? "Signing in..." : "Check My Tasks & Status"}
               <ArrowRight size={20} />
             </button>
 

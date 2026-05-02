@@ -1,21 +1,20 @@
 import React, { useState, useRef } from "react";
 import { Link, useNavigate, useLocation } from "react-router";
-import { Camera, User, Hash, Mail, Lock, ArrowRight, ArrowLeft, MapPin, Calendar, BookOpen, ShieldCheck, Eye, EyeOff } from "lucide-react";
+import { User, Hash, Mail, Lock, ArrowRight, ArrowLeft, MapPin, Calendar, BookOpen, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
 
 export function SignUp() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const location = useLocation();
   const state = location.state as { role?: string } | null;
+  const { login } = useAuth();
   const role = state?.role || "student"; // Default to student
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -36,14 +35,6 @@ export function SignUp() {
     setError(""); // Clear error when user types
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const imageUrl = URL.createObjectURL(file);
-      setPreviewImage(imageUrl);
-    }
-  };
-
   const handleNext = () => {
     // Validation for Step 1
     if (step === 1) {
@@ -53,25 +44,6 @@ export function SignUp() {
       }
     } 
     // Validation for Step 2
-    else if (step === 2) {
-      if (!formData.email.trim() || !formData.password || !formData.confirmPassword) {
-        setError("Please fill out all fields to continue.");
-        return;
-      }
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        setError("Please enter a valid email address.");
-        return;
-      }
-      if (formData.password.length < 8) {
-        setError("Password must be at least 8 characters long.");
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setError("Passwords do not match.");
-        return;
-      }
-    }
     setError("");
     setStep((prev) => prev + 1);
   };
@@ -81,43 +53,72 @@ export function SignUp() {
     setStep((prev) => prev - 1);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const newUser = { ...formData, role, profileImage: previewImage };
-    console.log(`Creating ${role} account with:`, newUser);
+    // Ensure we trigger next or submit depending on the current step if Enter is pressed
+    if (step === 1) {
+      handleNext();
+      return;
+    }
 
-    // Fetch existing users from LocalStorage, or start with an empty array
-    const existingUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
-    existingUsers.push(newUser);
-    localStorage.setItem("sEEync_users", JSON.stringify(existingUsers));
+    // Validation for Step 2
+    if (!formData.email.trim() || !formData.password || !formData.confirmPassword) {
+      setError("Please fill out all fields to continue.");
+      return;
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (formData.password.length < 8) {
+      setError("Password must be at least 8 characters long.");
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
 
-    // Log the user into the global context immediately
-    login({
-      fullName: formData.fullName,
-      email: formData.email,
-      role: role,
-      officerPosition: formData.officerPosition,
-      idNumber: formData.idNumber,
-      profileImage: previewImage
-    });
+    setIsLoading(true);
+    try {
+      // Mock network delay
+      await new Promise(resolve => setTimeout(resolve, 800));
 
-    // After successful creation, route users to their respective onboarding screens
-    navigate(role === "officer" ? "/create-block" : "/join-block", { state: { name: formData.fullName, position: formData.officerPosition } });
+      const newUser = { ...formData, role };
+      const existingUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
+      existingUsers.push(newUser);
+      localStorage.setItem("sEEync_users", JSON.stringify(existingUsers));
+
+      // Log the user into the global context immediately
+      login({
+        fullName: formData.fullName,
+        email: formData.email,
+        role: role,
+        officerPosition: formData.officerPosition,
+        idNumber: formData.idNumber,
+      });
+
+      // After successful creation, route users to their respective onboarding screens
+      navigate(role === "officer" ? "/create-block" : "/join-block", { state: { name: formData.fullName, position: formData.officerPosition } });
+    } catch (err: any) {
+      setError(err.message || "An error occurred during sign up.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const loginPath = role === "officer" ? "/admin-login" : "/";
 
   const getStepTitle = () => {
     if (step === 1) return "Personal Info";
-    if (step === 2) return "Account Details";
-    return "Profile Picture";
+    return "Account Details";
   };
 
   const getStepDesc = () => {
     if (step === 1) return `Let's start with your ${role} details`;
-    if (step === 2) return "Set up your login credentials";
-    return "Personalize your student profile";
+    return "Set up your login credentials";
   };
 
   return (
@@ -146,7 +147,7 @@ export function SignUp() {
 
         {/* Step Indicators */}
         <div className="flex justify-center gap-2 mb-8">
-          {[1, 2, 3].map((i) => (
+          {[1, 2].map((i) => (
             <div
               key={i}
               className={`h-2 w-10 rounded-full transition-colors duration-500 ${
@@ -372,6 +373,7 @@ export function SignUp() {
                       value={formData.password}
                       onChange={handleInputChange}
                       placeholder="••••••••"
+                      minLength={8}
                       className="w-full pl-11 pr-12 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:bg-white dark:focus:bg-slate-800 transition-all text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
                     />
                     <button
@@ -401,6 +403,7 @@ export function SignUp() {
                       value={formData.confirmPassword}
                       onChange={handleInputChange}
                       placeholder="••••••••"
+                      minLength={8}
                       className="w-full pl-11 pr-12 py-3.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-orange-500 focus:bg-white dark:focus:bg-slate-800 transition-all text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500"
                     />
                     <button
@@ -421,53 +424,8 @@ export function SignUp() {
                   <button type="button" onClick={handleBack} className="w-1/4 py-4 px-4 bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-white font-bold rounded-xl transition-colors flex items-center justify-center">
                     <ArrowLeft size={20} />
                   </button>
-                  <button type="button" onClick={handleNext} className="w-3/4 py-4 px-6 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg flex items-center justify-center gap-2">
-                    Next Step <ArrowRight size={20} />
-                  </button>
-                </div>
-              </motion.div>
-            )}
-
-            {/* STEP 3: PROFILE PICTURE (OPTIONAL) */}
-            {step === 3 && (
-              <motion.div
-                key="step3"
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -20 }}
-                transition={{ duration: 0.2 }}
-                className="space-y-5"
-              >
-                <div className="flex flex-col items-center justify-center py-4">
-                  <div
-                    className="relative w-32 h-32 rounded-full bg-slate-50 dark:bg-slate-700 border-4 border-dashed border-slate-300 dark:border-slate-500 flex items-center justify-center cursor-pointer hover:border-orange-500 transition-all overflow-hidden group"
-                    onClick={() => fileInputRef.current?.click()}
-                  >
-                    {previewImage ? (
-                      <img src={previewImage} alt="Profile Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Camera className="text-slate-400 dark:text-slate-500 group-hover:text-orange-500 transition-colors" size={36} />
-                    )}
-                    {/* Hidden File Input */}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleImageUpload}
-                      accept="image/*"
-                      className="hidden"
-                    />
-                  </div>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-4 font-medium text-center px-4 transition-colors">
-                    {previewImage ? "Looking good!" : "Click the circle above to upload a photo (Optional)"}
-                  </p>
-                </div>
-
-                <div className="pt-4 flex flex-col gap-3">
-                  <button type="submit" className="w-full py-4 px-6 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg">
-                    {previewImage ? "Complete Setup" : "Skip & Complete"}
-                  </button>
-                  <button type="button" onClick={handleBack} className="w-full py-3 px-6 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white font-bold transition-colors">
-                    Go Back
+              <button type="submit" disabled={isLoading} className="w-3/4 py-4 px-6 bg-orange-600 hover:bg-orange-500 disabled:opacity-70 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg flex items-center justify-center gap-2">
+                {isLoading ? "Creating..." : "Complete Setup"} <ArrowRight size={20} />
                   </button>
                 </div>
               </motion.div>

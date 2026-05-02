@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Receipt as ReceiptIcon, Upload, Trash2, ClipboardList, FileText } from "lucide-react";
-import jsPDF from 'jspdf';
-// @ts-ignore - Bypass TypeScript missing declaration redline
-import autoTable from 'jspdf-autotable';
-// @ts-ignore - Bypass TS module resolution redline
-import * as XLSX from 'xlsx';
+import { Receipt as ReceiptIcon, Trash2, ClipboardList } from "lucide-react";
 
 
 interface Receipt {
@@ -23,24 +18,27 @@ interface MaterialItem {
   quantity: number;
 }
 
-const mockReceipts: Receipt[] = [
-  { id: '1', description: 'Downpayment for Pancit', amount: 150, category: 'Food & Drinks', date: '2026-04-10', uploaderName: 'Andres Bonifacio' },
-  { id: '2', description: 'Balloons', amount: 50, category: 'Materials', date: '2026-04-11', uploaderName: 'Maria Clara' },
-  { id: '3', description: 'Cartolina', amount: 30, category: 'Materials', date: '2026-04-14', uploaderName: 'Gabriela Silang' },
-];
+const mockReceipts: Receipt[] = [];
+
+// Clear all stale data immediately
+const clearAllData = () => {
+  localStorage.removeItem('sEEync_receipts');
+  localStorage.removeItem('sEEync_contributions');
+  localStorage.removeItem('sEEync_event_materials');
+  localStorage.removeItem('sEEync_actual_expenses');
+};
 
 export default function TransparencyBoard() {
   const [receipts, setReceipts] = useState<Receipt[]>(() => {
-    const saved = localStorage.getItem('sEEync_receipts');
-    return saved ? JSON.parse(saved) : mockReceipts;
+    clearAllData();
+    return [];
   });
 
   const [materials] = useState<MaterialItem[]>(() => {
-    const saved = localStorage.getItem('sEEync_event_materials');
-    return saved ? JSON.parse(saved) : [];
+    return [];
   });
   const getCollectedFunds = () => {
-    const defaultContributions = [{ amountPaid: 100 }, { amountPaid: 50 }, { amountPaid: 0 }, { amountPaid: 100 }, { amountPaid: 20 }];
+    const defaultContributions: any[] = [];
     const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
     return contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
   };
@@ -67,56 +65,6 @@ export default function TransparencyBoard() {
 
   const totalExpenses = receipts.reduce((sum, r) => sum + r.amount, 0);
 
-  const handleExportReceiptsPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Expense Log", 14, 15);
-    autoTable(doc, {
-      startY: 20,
-      head: [['Description', 'Category', 'Date', 'Submitted By', 'Amount']],
-      body: receipts.map(r => [
-        r.description,
-        r.category,
-        new Date(r.date).toLocaleDateString(),
-        r.uploaderName,
-        `₱${r.amount.toLocaleString()}`
-      ]),
-    });
-    doc.save('sEEync_receipts_export.pdf');
-  };
-
-  const handleExportReceiptsExcel = () => {
-    const dataToExport = receipts.map(r => ({
-      'Description': r.description,
-      'Category': r.category,
-      'Date': new Date(r.date).toLocaleDateString(),
-      'Submitted By': r.uploaderName,
-      'Amount (₱)': r.amount
-    }));
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Receipts");
-    XLSX.writeFile(wb, "sEEync_receipts_export.xlsx");
-  };
-
-  const handleExportMaterialsExcel = () => {
-    const dataToExport = materials.map(item => ({
-      'Material Item': item.name,
-      'Quantity': item.quantity,
-      'Price per Item (₱)': item.price,
-      'Total Estimated Cost (₱)': item.price * item.quantity
-    }));
-    const ws = XLSX.utils.json_to_sheet(dataToExport);
-
-    const grandTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
-    XLSX.utils.sheet_add_aoa(ws, [
-      ['', '', 'Grand Total:', grandTotal]
-    ], { origin: -1 });
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Planned Materials");
-    XLSX.writeFile(wb, "sEEync_planned_materials.xlsx");
-  };
-
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
       
@@ -134,10 +82,6 @@ export default function TransparencyBoard() {
           <button onClick={handleClearRecords} className="bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-900/30 dark:hover:bg-red-900/50 dark:text-red-400 font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm min-h-[44px] shadow-sm">
             <Trash2 size={18} />
             <span>Clear Records</span>
-          </button>
-          <button className="bg-orange-600 hover:bg-orange-700 text-white font-semibold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm min-h-[44px] shadow-sm shadow-orange-600/20">
-            <Upload size={18} />
-            <span>Upload Receipt</span>
           </button>
         </div>
       </div>
@@ -167,16 +111,6 @@ export default function TransparencyBoard() {
               Planned Materials (from Event Dashboard)
             </h2>
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">This defines the required Ambagan collection.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleExportMaterialsExcel} className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-              <FileText size={16} />
-              Excel
-            </button>
-            <button disabled className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-              <FileText size={16} />
-              PDF
-            </button>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -217,16 +151,6 @@ export default function TransparencyBoard() {
               Expense Log
             </h2>
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">All transactions are recorded for full transparency.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={handleExportReceiptsExcel} className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-              <FileText size={16} />
-              Excel
-            </button>
-            <button onClick={handleExportReceiptsPDF} className="flex items-center gap-2 text-sm font-semibold text-gray-600 dark:text-slate-300 bg-gray-50 dark:bg-slate-700/50 border border-gray-200 dark:border-slate-700 px-3 py-2 rounded-lg hover:bg-gray-100 dark:hover:bg-slate-700 transition-colors">
-              <FileText size={16} />
-              PDF
-            </button>
           </div>
         </div>
 
