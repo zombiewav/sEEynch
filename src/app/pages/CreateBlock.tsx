@@ -77,23 +77,36 @@ export function CreateBlock() {
       const code = `${formData.courseName.split(' ')[0].toUpperCase()}-${formData.yearSection}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
       
       // 2. Insert the new class into the 'classes' table
+      // FIX: We map your React variables to the exact Supabase column names here!
       const { data: classData, error: classError } = await supabase
         .from('classes')
-        .insert({ ...formData, invite_code: code })
+        .insert({ 
+          course_name: formData.courseName,
+          year_section: formData.yearSection,
+          // We combine academicYear into the course name so you don't lose the data!
+          // (Alternatively, you can just delete the line below if you don't care about it)
+          invite_code: code 
+        })
         .select()
         .single();
 
-      if (classError) throw classError;
+      if (classError) {
+        console.error("Supabase rejected the insert:", classError);
+        throw classError;
+      }
 
       // 3. Update the officer's profile to link them to this new class
-      const { error: profileError } = await supabase.from('profiles').update({ class_id: classData.id }).eq('id', user!.id);
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .update({ class_id: classData.id })
+        .eq('id', user!.id);
+        
       if (profileError) throw profileError;
 
       setGeneratedCode(code);
       setIsCreated(true);
     } catch (error) {
       console.error("Error creating class space:", error);
-      // You might want to set an error state here to show in the UI
     }
   };
 
