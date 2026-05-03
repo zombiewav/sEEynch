@@ -1,39 +1,44 @@
 import React, { useState, useEffect } from "react";
 import { CheckCircle2, Circle, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-
-interface TodoItem {
-  id: string;
-  text: string;
-  isDone: boolean;
-}
-
-interface MaterialItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-const mockTodos: TodoItem[] = [];
-const mockMaterials: MaterialItem[] = [];
+import { useTodos } from "../../hooks/useTodos";
+import { useMaterials } from "../../hooks/useMaterials";
+import { useActivityLog } from "../../hooks/useActivityLog";
 
 export default function EventDashboard() {
   const { user } = useAuth();
-  const [todos, setTodos] = useState<TodoItem[]>(() => {
-    const saved = localStorage.getItem('sEEync_event_todos');
-    return saved ? JSON.parse(saved) : mockTodos;
-  });
-  const [materials, setMaterials] = useState<MaterialItem[]>(() => {
-    const saved = localStorage.getItem('sEEync_event_materials');
-    return saved ? JSON.parse(saved) : mockMaterials;
-  });
+  const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();
+  const { materials, addMaterial, updateMaterial, deleteMaterial } = useMaterials();
+  const { addActivity } = useActivityLog();
+  
+  const [localMaterials, setLocalMaterials] = useState<Record<string, { price: string, quantity: string }>>({});
 
   useEffect(() => {
-    localStorage.setItem('sEEync_event_todos', JSON.stringify(todos));
-  }, [todos]);
+    setLocalMaterials(prev => {
+      const next = { ...prev };
+      let changed = false;
+      materials.forEach(m => {
+        const priceActive = document.activeElement?.id === `price-${m.id}`;
+        const qtyActive = document.activeElement?.id === `qty-${m.id}`;
+        
+        if (!next[m.id]) {
+          next[m.id] = { price: m.price.toString(), quantity: m.quantity.toString() };
+          changed = true;
+        } else {
+          if (!priceActive && Number(next[m.id].price) !== m.price) {
+            next[m.id].price = m.price.toString();
+            changed = true;
+          }
+          if (!qtyActive && Number(next[m.id].quantity) !== m.quantity) {
+            next[m.id].quantity = m.quantity.toString();
+            changed = true;
+          }
+        }
+      });
+      return changed ? next : prev;
+    });
 
-  useEffect(() => {
+    // Mirror expected expenses for the Ambagan Tracker & Transparency Board
     localStorage.setItem('sEEync_event_materials', JSON.stringify(materials));
     const gTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
     localStorage.setItem('sEEync_expected_expenses', gTotal.toString());
@@ -43,65 +48,58 @@ export default function EventDashboard() {
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialPrice, setNewMaterialPrice] = useState("");
 
-  const toggleTodo = (id: string) => {
-    setTodos(prev => prev.map(t => t.id === id ? { ...t, isDone: !t.isDone } : t));
-  };
-
-  const handleDeleteTodo = (id: string) => {
+  const handleDeleteTodo = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this task?")) {
-      setTodos(prev => prev.filter(t => t.id !== id));
+      await deleteTodo(id);
     }
   };
 
-  const handleDeleteMaterial = (id: string) => {
+  const handleDeleteMaterial = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this material?")) {
-      setMaterials(prev => prev.filter(m => m.id !== id));
+      await deleteMaterial(id);
     }
   };
 
-  const handleAddTodo = (e: React.FormEvent) => {
+  const handleAddTodo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
-    setTodos([...todos, { id: `t-${Date.now()}`, text: newTodo, isDone: false }]);
+    
+    try {
+      await addTodo(newTodo);
+    } catch (error) {
+      console.error(error);
+    }
+    
+    const todoText = newTodo;
     setNewTodo("");
 
-    // Log activity
-    const activity = {
-      id: `act-${Date.now()}`,
-      type: 'event',
-      message: `added a new to-do: "${newTodo}"`,
-      actor: user?.fullName || 'Officer',
-      timestamp: Date.now(),
-    };
-    const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-    log.unshift(activity);
-    localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
+    await addActivity('event', `added a new to-do: "${todoText}"`, user?.fullName || 'Officer');
   };
 
-  const handleAddMaterial = (e: React.FormEvent) => {
+  const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMaterialName.trim()) return;
     const price = parseFloat(newMaterialPrice) || 0;
-    setMaterials([...materials, { id: `m-${Date.now()}`, name: newMaterialName, price, quantity: 1 }]);
+    
+    try {
+      await addMaterial(newMaterialName, price);
+    } catch (error) {
+      console.error(error);
+    }
+    
+    const matName = newMaterialName;
     setNewMaterialName("");
     setNewMaterialPrice("");
 
-    // Log activity
-    const activity = {
-      id: `act-${Date.now()}`,
-      type: 'event',
-      message: `added a new material: "${newMaterialName}"`,
-      actor: user?.fullName || 'Officer',
-      timestamp: Date.now(),
-    };
-    const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-    log.unshift(activity);
-    localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
+    await addActivity('event', `added a new material: "${matName}"`, user?.fullName || 'Officer');
   };
 
-  const handleMaterialChange = (id: string, field: 'price' | 'quantity', value: string) => {
+  const handleMaterialSubmit = async (id: string, field: 'price' | 'quantity', value: string) => {
     const numValue = parseFloat(value) || 0;
-    setMaterials(prev => prev.map(m => m.id === id ? { ...m, [field]: numValue } : m));
+    const material = materials.find(m => m.id === id);
+    if (material && material[field] !== numValue) {
+      await updateMaterial(id, field, numValue);
+    }
   };
 
   // Derived state computations
@@ -166,7 +164,7 @@ export default function EventDashboard() {
                 {todos.map(todo => (
                   <li 
                     key={todo.id} 
-                    onClick={() => toggleTodo(todo.id)}
+                    onClick={() => toggleTodo(todo.id, todo.isDone)}
                     className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todo.isDone ? 'opacity-60' : ''}`}
                   >
                     <div className={`mt-0.5 shrink-0 ${todo.isDone ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>
@@ -237,11 +235,25 @@ export default function EventDashboard() {
                         <td className="px-6 py-4">
                           <div className="relative">
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 dark:text-slate-400 text-sm font-medium">₱</span>
-                            <input type="number" min="0" value={item.price || ''} onChange={(e) => handleMaterialChange(item.id, 'price', e.target.value)} className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm text-slate-900 dark:text-slate-100 transition-colors shadow-sm" />
+                            <input 
+                              id={`price-${item.id}`}
+                              type="number" min="0" 
+                              value={localMaterials[item.id]?.price ?? ''} 
+                              onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], price: e.target.value}}))} 
+                              onBlur={(e) => handleMaterialSubmit(item.id, 'price', e.target.value)}
+                              className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm text-slate-900 dark:text-slate-100 transition-colors shadow-sm" 
+                            />
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <input type="number" min="0" value={item.quantity || ''} onChange={(e) => handleMaterialChange(item.id, 'quantity', e.target.value)} className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm text-slate-900 dark:text-slate-100 transition-colors shadow-sm" />
+                          <input 
+                            id={`qty-${item.id}`}
+                            type="number" min="0" 
+                            value={localMaterials[item.id]?.quantity ?? ''} 
+                            onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], quantity: e.target.value}}))} 
+                            onBlur={(e) => handleMaterialSubmit(item.id, 'quantity', e.target.value)}
+                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm text-slate-900 dark:text-slate-100 transition-colors shadow-sm" 
+                          />
                         </td>
                         <td className="px-6 py-4 text-right font-bold text-slate-700 dark:text-slate-300 transition-colors">
                           ₱{totalCost.toLocaleString()}

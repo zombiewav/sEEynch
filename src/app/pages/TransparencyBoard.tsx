@@ -1,69 +1,40 @@
-import React, { useState, useEffect } from "react";
-import { Receipt as ReceiptIcon, Trash2, ClipboardList } from "lucide-react";
-
-
-interface Receipt {
-  id: string;
-  description: string;
-  amount: number;
-  category: 'Venue' | 'Food & Drinks' | 'Materials' | 'Logistics' | 'Miscellaneous';
-  date: string;
-  uploaderName: string;
-}
-
-interface MaterialItem {
-  id: string;
-  name: string;
-  price: number;
-  quantity: number;
-}
-
-const mockReceipts: Receipt[] = [];
-
-// Clear all stale data immediately
-const clearAllData = () => {
-  localStorage.removeItem('sEEync_receipts');
-  localStorage.removeItem('sEEync_contributions');
-  localStorage.removeItem('sEEync_event_materials');
-  localStorage.removeItem('sEEync_actual_expenses');
-};
+import React, { useState } from "react";
+import { Receipt as ReceiptIcon, Trash2, ClipboardList, Plus } from "lucide-react";
+import { useReceipts } from "../../hooks/useReceipts";
+import { useMaterials } from "../../hooks/useMaterials";
+import { useContributions } from "../../hooks/useContributions";
 
 export default function TransparencyBoard() {
-  const [receipts, setReceipts] = useState<Receipt[]>(() => {
-    clearAllData();
-    return [];
-  });
+  const { receipts, addReceipt, deleteReceipt, clearAllReceipts } = useReceipts();
+  const { materials } = useMaterials();
+  const { contributions } = useContributions();
 
-  const [materials] = useState<MaterialItem[]>(() => {
-    return [];
-  });
-  const getCollectedFunds = () => {
-    const defaultContributions: any[] = [];
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
-    return contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
-  };
-
-  const collectedFunds = getCollectedFunds();
-
-  useEffect(() => {
-    localStorage.setItem('sEEync_receipts', JSON.stringify(receipts));
-    const totalExp = receipts.reduce((sum, r) => sum + r.amount, 0);
-    localStorage.setItem('sEEync_actual_expenses', totalExp.toString());
-  }, [receipts]);
-
-  const handleClearRecords = () => {
-    if(window.confirm("Are you sure you want to clear all expense records?")) {
-      setReceipts([]);
-    }
-  };
-
-  const handleDeleteReceipt = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      setReceipts(prev => prev.filter(r => r.id !== id));
-    }
-  };
-
+  const collectedFunds = contributions.reduce((sum, c) => sum + c.amountPaid, 0);
   const totalExpenses = receipts.reduce((sum, r) => sum + r.amount, 0);
+
+  const [newDesc, setNewDesc] = useState("");
+  const [newAmount, setNewAmount] = useState("");
+  const [newCategory, setNewCategory] = useState("Miscellaneous");
+
+  const handleClearRecords = async () => {
+    if(window.confirm("Are you sure you want to clear all expense records?")) {
+      await clearAllReceipts();
+    }
+  };
+
+  const handleDeleteReceipt = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this expense?")) {
+      await deleteReceipt(id);
+    }
+  };
+
+  const handleAddExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDesc.trim() || !newAmount) return;
+    await addReceipt(newDesc, parseFloat(newAmount), newCategory, new Date().toISOString().split('T')[0]);
+    setNewDesc("");
+    setNewAmount("");
+  };
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -153,6 +124,20 @@ export default function TransparencyBoard() {
             <p className="text-sm text-gray-500 dark:text-slate-400 mt-1">All transactions are recorded for full transparency.</p>
           </div>
         </div>
+
+        {/* Add New Expense Form */}
+        <form onSubmit={handleAddExpense} className="p-4 sm:p-6 border-b border-gray-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-3 transition-colors">
+          <input type="text" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Expense description" className="flex-[2] px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100" />
+          <input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="Amount (₱)" className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100" />
+          <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100">
+            <option value="Venue">Venue</option>
+            <option value="Food & Drinks">Food & Drinks</option>
+            <option value="Materials">Materials</option>
+            <option value="Logistics">Logistics</option>
+            <option value="Miscellaneous">Miscellaneous</option>
+          </select>
+          <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-orange-600/20 whitespace-nowrap"><Plus size={16} /> Log Expense</button>
+        </form>
 
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">

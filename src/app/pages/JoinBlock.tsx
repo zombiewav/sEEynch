@@ -3,19 +3,45 @@ import { useNavigate, useLocation } from "react-router";
 import { Hash, ArrowRight, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
+import { supabase } from "../../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 export function JoinBlock() {
   const navigate = useNavigate();
   const location = useLocation();
-  const studentName = location.state?.name || "Student";
+  const { user } = useAuth();
+  const studentName = user?.fullName || location.state?.name || "Student";
   
   const [inviteCode, setInviteCode] = useState("");
   const [isJoined, setIsJoined] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+    setIsLoading(true);
     if (inviteCode.trim().length > 0) {
-      setIsJoined(true);
+      try {
+        // 1. Find the class with the invite code
+        const { data: classData, error: classError } = await supabase
+          .from('classes')
+          .select('id')
+          .eq('invite_code', inviteCode.trim())
+          .single();
+
+        if (classError || !classData) throw new Error("Invalid invite code.");
+
+        // 2. Update the current user's profile with the class_id
+        const { error: profileError } = await supabase.from('profiles').update({ class_id: classData.id }).eq('id', user!.id);
+        if (profileError) throw profileError;
+
+        setIsJoined(true);
+      } catch (err: any) {
+        setError(err.message || "Could not join the class.");
+      } finally {
+        setIsLoading(false);
+      }
     }
   };
 
@@ -65,11 +91,15 @@ export function JoinBlock() {
                       required
                     />
                   </div>
+                  {error && (
+                    <p className="text-xs text-red-500 font-medium mt-2">{error}</p>
+                  )}
                 </div>
 
                 <div className="pt-2">
-                  <button type="submit" className="w-full py-4 px-6 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg flex justify-center items-center gap-2">
-                    Join Block <ArrowRight size={20} />
+                  <button type="submit" disabled={isLoading} className="w-full py-4 px-6 bg-orange-600 hover:bg-orange-500 disabled:opacity-70 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg flex justify-center items-center gap-2">
+                    {isLoading ? "Joining..." : "Join Block"}
+                    <ArrowRight size={20} />
                   </button>
                 </div>
               </form>

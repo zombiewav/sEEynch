@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useNavigate, useLocation } from "react-router";
 import { AlertCircle, CheckCircle2, Clock, Calendar, ArrowLeft } from "lucide-react";
-import { Task, TaskStatus } from "../data/mockData";
 import { useAuth } from "../contexts/AuthContext";
+import { useTasks } from "../../hooks/useTasks";
 
 type AssessmentType = 'Module' | 'Plate' | 'Exam' | 'Other';
 
@@ -22,43 +22,21 @@ export default function DeadlineMonitor() {
   const state = location.state as { name?: string } | null;
   const studentName = user?.fullName || state?.name || "Student";
   
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const { tasks, updateTaskStatus } = useTasks();
+  const ownTasks = tasks.filter(task => 
+    task.studentName.toLowerCase().includes(studentName.toLowerCase().split(' ')[0])
+  );
 
-  useEffect(() => {
-    const savedTasks = localStorage.getItem("sEEync_tasks");
-    if (savedTasks) {
-      try {
-        const allTasks = JSON.parse(savedTasks) as Task[];
-        const ownTasks = allTasks.filter(task => 
-          task.studentName.toLowerCase().includes(studentName.toLowerCase().split(' ')[0])
-        );
-        setTasks(ownTasks);
-      } catch {
-        setTasks([]);
-      }
+  const toggleDone = async (id: string) => {
+    const task = ownTasks.find(t => t.id === id);
+    if (task) {
+      const newStatus = task.status === 'Done' ? 'Pending' : 'Done';
+      await updateTaskStatus(id, newStatus);
     }
-  }, [studentName]);
-
-  const toggleDone = (id: string) => {
-    const allTasksStr = localStorage.getItem("sEEync_tasks") || "[]";
-    const allTasks: Task[] = JSON.parse(allTasksStr);
-    
-    const updatedAllTasks = allTasks.map(task => {
-      if (task.id === id) {
-        const newStatus: TaskStatus = task.status === 'Done' ? 'Pending' : 'Done';
-        return { ...task, status: newStatus };
-      }
-      return task;
-    });
-    
-    localStorage.setItem("sEEync_tasks", JSON.stringify(updatedAllTasks));
-    
-    // Update local state
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, status: updatedAllTasks.find(at => at.id === id)?.status! } : t));
   };
 
   // Transform to deadlines
-  const deadlines: Deadline[] = tasks.map(task => ({
+  const deadlines: Deadline[] = ownTasks.map(task => ({
     id: task.id,
     title: task.taskDesc,
     subject: 'Class Toka', 

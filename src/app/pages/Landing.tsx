@@ -3,11 +3,10 @@ import { useNavigate, Link } from "react-router";
 import { GraduationCap, ArrowRight, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { useAuth, type User } from "../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 export function Landing() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [studentEmail, setStudentEmail] = useState("");
   const [studentPassword, setStudentPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,18 +19,26 @@ export function Landing() {
     if (studentEmail.trim() && studentPassword.trim()) {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
-        const user = storedUsers.find(
-          (u: Record<string, any>) => u.email === studentEmail && u.password === studentPassword && u.role === "student"
-        );
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: studentEmail,
+          password: studentPassword,
+        });
+        if (signInError) throw signInError;
+        
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name')
+          .eq('id', data.user.id)
+          .single();
 
-        if (user) {
-          login(user as User);
-          navigate("/student", { state: { name: user.fullName } });
-        } else {
-          throw new Error("Invalid email or password. Please try again.");
+        if (profileError) throw profileError;
+
+        if (profile.role !== 'student') {
+          await supabase.auth.signOut();
+          throw new Error("Unauthorized. This portal is for students only.");
         }
+
+        navigate("/student", { state: { name: profile.full_name } });
       } catch (err: any) {
         setError(err.message || "Invalid email or password.");
       } finally {
@@ -122,10 +129,10 @@ export function Landing() {
 
             <button
               type="submit"
-          disabled={isLoading}
-          className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg min-h-[56px] shadow-md shadow-orange-500/20 dark:shadow-orange-600/20 hover:shadow-lg hover:-translate-y-0.5"
+              disabled={isLoading}
+              className="w-full bg-orange-500 hover:bg-orange-600 disabled:opacity-70 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold py-4 px-6 rounded-xl transition-all flex items-center justify-center gap-2 text-lg min-h-[56px] shadow-md shadow-orange-500/20 dark:shadow-orange-600/20 hover:shadow-lg hover:-translate-y-0.5"
             >
-          {isLoading ? "Signing in..." : "Check My Tasks & Status"}
+              {isLoading ? "Signing in..." : "Check My Tasks & Status"}
               <ArrowRight size={20} />
             </button>
 

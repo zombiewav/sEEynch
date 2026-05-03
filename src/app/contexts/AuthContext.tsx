@@ -1,40 +1,89 @@
-import { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { supabase } from '../../lib/supabase';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 
 export interface User {
+  id: string;
   fullName: string;
   email: string;
   role: string;
   officerPosition?: string;
   idNumber?: string;
   profileImage?: string | null;
+  classId?: string;
 }
 
 interface AuthContextType {
   user: User | null;
-  login: (userData: User) => void;
-  logout: () => void;
+  session: Session | null;
+  isLoading: boolean;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialize the state directly from localStorage if it exists
-  const [user, setUser] = useState<User | null>(() => {
-    const storedUser = localStorage.getItem("sEEync_currentUser");
-    return storedUser ? JSON.parse(storedUser) : null;
-  });
+  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const login = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem("sEEync_currentUser", JSON.stringify(userData));
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session?.user) {
+        fetchProfile(session.user);
+      } else {
+        setIsLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session?.user) {
+        fetchProfile(session.user);
+      } else {
+        setUser(null);
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const fetchProfile = async (authUser: SupabaseUser) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setUser({
+          id: data.id,
+          email: authUser.email || '',
+          fullName: data.full_name,
+          role: data.role,
+          officerPosition: data.officer_position,
+          idNumber: data.student_id,
+          classId: data.class_id,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching user profile:', error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem("sEEync_currentUser");
   };
 
-  return <AuthContext.Provider value={{ user, login, logout }}>{children}</AuthContext.Provider>;
+  return <AuthContext.Provider value={{ user, session, isLoading, logout }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {

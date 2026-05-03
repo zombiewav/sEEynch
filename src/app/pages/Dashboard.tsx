@@ -1,24 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useLocation } from "react-router";
 import { Wallet, ClipboardList, CalendarDays, Bell, Circle, CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
 import { useAuth } from "../contexts/AuthContext";
-
-interface Task {
-  id: string;
-  studentName: string;
-  taskDesc: string;
-  status: 'Pending' | 'In Progress' | 'Done';
-  dueDate: string;
-}
-
-interface Activity {
-  id: string;
-  type: 'task' | 'event' | 'payment' | 'expense' | 'member';
-  message: string;
-  timestamp: number;
-  actor: string;
-}
+import { useTasks } from "../../hooks/useTasks";
+import { useContributions } from "../../hooks/useContributions";
+import { useActivityLog } from "../../hooks/useActivityLog";
+import { useReceipts } from "../../hooks/useReceipts";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -26,55 +14,25 @@ export default function Dashboard() {
   const state = location.state as { name?: string } | null;
   const firstName = (user?.fullName || state?.name || "Officer").split(" ")[0];
 
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const toggleTask = (id: string) => {
-    setTasks(prev => {
-      const updated = prev.map(t => {
-        const newStatus: 'Pending' | 'In Progress' | 'Done' = t.status === 'Done' ? 'Pending' : 'Done';
-        return t.id === id ? { ...t, status: newStatus } : t;
-      });
-      localStorage.setItem("sEEync_tasks", JSON.stringify(updated));
-      return updated;
-    });
+  const { tasks, updateTaskStatus } = useTasks();
+  const { contributions } = useContributions();
+  const { activities } = useActivityLog();
+  const { receipts } = useReceipts();
+
+  const toggleTask = async (id: string) => {
+    const task = tasks.find(t => t.id === id);
+    if (task) {
+      const newStatus = task.status === 'Done' ? 'Pending' : 'Done';
+      await updateTaskStatus(id, newStatus);
+    }
   };
+
   const activeTaskCount = tasks.filter(t => t.status !== 'Done').length;
 
-  const [balance, setBalance] = useState(0);
-  const [unpaidCount, setUnpaidCount] = useState(0);
-  const [activities, setActivities] = useState<Activity[]>([]);
-
-  useEffect(() => {
-    // This effect will re-run every time the user navigates to the dashboard, ensuring data is fresh.
-    const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
-    
-    const defaultContributions: any[] = [];
-    const defaultReceipts: any[] = [];
-    
-    let contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
-    let receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
-
-    // Filter out dummy data
-    contributions = contributions.filter((c: any) => !isDummyName(c.name));
-    receiptsData = receiptsData.filter((r: any) => !isDummyName(r.uploaderName));
-    
-    // Update localStorage with cleaned data
-    localStorage.setItem('sEEync_contributions', JSON.stringify(contributions));
-    localStorage.setItem('sEEync_receipts', JSON.stringify(receiptsData));
-
-    const newCollected = contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
-    const newExpenses = receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
-    setBalance(newCollected - newExpenses);
-
-    const newUnpaidCount = contributions.filter((c: any) => c.status && c.status !== 'Paid').length;
-    setUnpaidCount(newUnpaidCount);
-
-    const savedActivities = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-    setActivities(savedActivities);
-
-    const defaultTasks: Task[] = [];
-    const savedTasks = JSON.parse(localStorage.getItem('sEEync_tasks') || "null") || defaultTasks;
-    setTasks(savedTasks);
-  }, [location]);
+  const collected = contributions.reduce((sum, c) => sum + c.amountPaid, 0);
+  const expenses = receipts.reduce((sum, r) => sum + r.amount, 0);
+  const balance = collected - expenses;
+  const unpaidCount = contributions.filter(c => c.status && c.status !== 'Paid').length;
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -198,7 +156,7 @@ export default function Dashboard() {
                 <h3 className={`font-semibold transition-colors ${task.status === 'Done' ? 'text-gray-400 dark:text-slate-500 line-through' : 'text-gray-900 dark:text-white'}`}>
                   {task.taskDesc}
                   </h3>
-                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 transition-colors">{task.studentName} • {new Date(task.dueDate).toLocaleDateString()}</p>
+                <p className="text-sm text-gray-500 dark:text-slate-400 mt-1 transition-colors">{task.studentName}{task.dueDate ? ` • ${new Date(task.dueDate).toLocaleDateString()}` : ''}</p>
                 </div>
               </div>
             ))}

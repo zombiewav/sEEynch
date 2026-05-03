@@ -17,31 +17,16 @@ import {
   Check
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { budgetData, eventData, Task, TaskStatus, Receipt } from "../data/mockData";
+import { eventData, TaskStatus } from "../data/mockData";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
-
-const isDummyTask = (task: Task) => task.studentName.toLowerCase().startsWith("test");
-
-const parseSavedTasks = (value: string | null): Task[] => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value) as Task[];
-    const filtered = parsed.filter(task => !isDummyTask(task));
-    if (filtered.length !== parsed.length) {
-      localStorage.setItem("sEEync_tasks", JSON.stringify(filtered));
-    }
-    return filtered;
-  } catch {
-    return [];
-  }
-};
+import { useTasks, Task } from "../../hooks/useTasks";
+import { useMembers } from "../../hooks/useMembers";
+import { useContributions } from "../../hooks/useContributions";
+import { useReceipts } from "../../hooks/useReceipts";
+import { useMaterials } from "../../hooks/useMaterials";
 
 export function AdminDashboard() {
-  // Clear stale expense data immediately
-  localStorage.removeItem('sEEync_event_materials');
-  localStorage.removeItem('sEEync_receipts');
-  
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const location = useLocation();
@@ -54,16 +39,11 @@ export function AdminDashboard() {
     .join("")
     .toUpperCase()
     .slice(0, 2);
-
-  const [tasks, setTasks] = useState<Task[]>(() => parseSavedTasks(localStorage.getItem("sEEync_tasks")));
-  const [receipts, setReceipts] = useState(() => {
-    const saved = localStorage.getItem('sEEync_receipts');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem("sEEync_tasks", JSON.stringify(tasks));
-  }, [tasks]);
+  
+  const { tasks, addTask, updateTaskStatus, loading: tasksLoading } = useTasks();
+  const { contributions } = useContributions();
+  const { receipts } = useReceipts();
+  const { materials } = useMaterials();
 
 // Class Invite State
   const inviteCode = "BSEE-1B-XYZ";
@@ -78,27 +58,8 @@ export function AdminDashboard() {
   // Assign Task modal state
   const [showTaskModal, setShowTaskModal] = useState(false);
 
-  const [members, setMembers] = useState<any[]>(() => {
-    const saved = localStorage.getItem('sEEync_members');
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved) as any[];
-        const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
-        const filtered = parsed.filter(m => !isDummyName(m.name));
-        if (filtered.length !== parsed.length) {
-          localStorage.setItem('sEEync_members', JSON.stringify(filtered));
-        }
-        return filtered;
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  const { members, loading: membersLoading } = useMembers();
 
-  // Budget Modal state - FIX 1 & 2
-  const [showBudgetModal, setShowBudgetModal] = useState(false);
-  const [budgetForm, setBudgetForm] = useState({ goal: '', collected: '', expenses: '' });
   const [taskForm, setTaskForm] = useState({
     studentName: "",
     taskDesc: "",
@@ -122,7 +83,7 @@ export function AdminDashboard() {
     setShowTaskModal(true);
   };
 
-  const handleTaskSave = (e: React.FormEvent) => {
+  const handleTaskSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!taskForm.studentName.trim() || !taskForm.taskDesc.trim()) {
       setTaskFormError("Please select a student and enter a task description.");
@@ -141,51 +102,27 @@ export function AdminDashboard() {
       .split(",")
       .map(m => m.trim())
       .filter(m => m.length > 0);
-    const newTask: Task = {
-      id: `t${Date.now()}`,
+    const newTaskData = {
       studentName: taskForm.studentName.trim(),
       taskDesc: taskForm.taskDesc.trim(),
       status: taskForm.status,
       materials,
       dueDate: taskForm.dueDate || undefined,
     };
-    setTasks(prev => [...prev, newTask]);
-    setShowTaskModal(false);
-  };
-
-  // Budget state
-  const getBudget = () => {
-    const defaultContributions: any[] = [];
-    const defaultReceipts: any[] = [];
-    const defaultMaterials: any[] = [];
-
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
-    const materialsData = JSON.parse(localStorage.getItem('sEEync_event_materials') || "null") || defaultMaterials;
-
-    return {
-      collected: contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0),
-      goal: materialsData.reduce((sum: number, m: any) => sum + ((m.price || 0) * (m.quantity || 0)), 0),
-      expenses: receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
-    };
-  };
-
-  const [budget, setBudget] = useState(getBudget);
-
-  // FIX 5: Type-safe localStorage parsing
-  useEffect(() => {
-    setBudget(getBudget());
-    setTasks(parseSavedTasks(localStorage.getItem("sEEync_tasks")));
-    
-    const savedReceipts = localStorage.getItem('sEEync_receipts');
-    if (savedReceipts) {
-      try {
-        setReceipts(JSON.parse(savedReceipts) as Receipt[]);
-      } catch {
-        setReceipts([]);
-      }
+    try {
+      await addTask(newTaskData as any);
+      setShowTaskModal(false);
+    } catch (error) {
+      console.error("Failed to add task:", error);
+      setTaskFormError((error as Error).message);
     }
-  }, []); // FIX 6: Remove location from deps as it's not used
+  };
+
+  const budget = {
+    collected: contributions.reduce((sum, c) => sum + c.amountPaid, 0),
+    goal: materials.reduce((sum, m) => sum + (m.price * m.quantity), 0),
+    expenses: receipts.reduce((sum, r) => sum + r.amount, 0)
+  };
 
   // Mock calculations
   const overdueCount = tasks.filter(t => t.status !== "Done" && t.dueDate && new Date(t.dueDate) < new Date()).length;
@@ -193,28 +130,8 @@ export function AdminDashboard() {
   const remainingBalance = budget.collected - budget.expenses;
   const progressPercent = budget.goal > 0 ? Math.min(100, (budget.collected / budget.goal) * 100) : 0;
 
-  const handleStatusChange = (taskId: string, newStatus: TaskStatus) => {
-    setTasks(tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t));
-  };
-
-  // FIX 4: Complete handleBudgetSave implementation
-  const handleBudgetSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    const goal = parseFloat(budgetForm.goal) || 0;
-    const collected = parseFloat(budgetForm.collected) || 0;
-    const expenses = parseFloat(budgetForm.expenses) || 0;
-    
-    // Save to localStorage
-    localStorage.setItem('sEEync_budget_goal', goal.toString());
-    localStorage.setItem('sEEync_budget_collected', collected.toString());
-    localStorage.setItem('sEEync_actual_expenses', expenses.toString());
-    
-    // Update budget state
-    setBudget({ goal, collected, expenses });
-    setShowBudgetModal(false);
-    
-    // Reset form
-    setBudgetForm({ goal: '', collected: '', expenses: '' });
+  const handleStatusChange = async (taskId: string, newStatus: TaskStatus) => {
+    await updateTaskStatus(taskId, newStatus);
   };
 
   return (
@@ -393,117 +310,6 @@ export function AdminDashboard() {
                     className="flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-800 text-white font-bold transition-colors shadow-md shadow-blue-500/20"
                   >
                     Assign Task
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Budget Modal */}
-      <AnimatePresence>
-        {showBudgetModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4"
-            onClick={() => setShowBudgetModal(false)}
-          >
-            <motion.div
-              initial={{ opacity: 0, scale: 0.95, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 10 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 w-full max-w-md p-6"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-xl font-bold text-blue-900 dark:text-blue-400">Edit Budget</h3>
-                  <p className="text-sm text-slate-500 dark:text-slate-400 mt-0.5">Update the financial figures below.</p>
-                </div>
-                <button
-                  onClick={() => setShowBudgetModal(false)}
-                  className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-
-              <form onSubmit={handleBudgetSave} className="space-y-4">
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Collection Goal (₱)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={budgetForm.goal}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, goal: e.target.value })}
-                    placeholder="e.g. 50000"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 dark:focus:ring-orange-400 text-slate-900 dark:text-slate-100 transition-colors"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Total Collected (₱)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={budgetForm.collected}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, collected: e.target.value })}
-                    placeholder="e.g. 38500"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400 text-slate-900 dark:text-slate-100 transition-colors"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    Total Expenses (₱)
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={budgetForm.expenses}
-                    onChange={(e) => setBudgetForm({ ...budgetForm, expenses: e.target.value })}
-                    placeholder="e.g. 18500"
-                    className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400 text-slate-900 dark:text-slate-100 transition-colors"
-                  />
-                </div>
-
-                {/* Live Preview */}
-                <div className="bg-slate-50 dark:bg-slate-900 rounded-xl p-4 border border-slate-100 dark:border-slate-700 space-y-1 text-sm">
-                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                    <span>Remaining Balance</span>
-                    <span className="font-bold text-emerald-600 dark:text-emerald-400">
-                      ₱{Math.max(0, ((parseFloat(budgetForm.collected) || 0) - (parseFloat(budgetForm.expenses) || 0))).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between text-slate-600 dark:text-slate-400">
-                    <span>Goal Progress</span>
-                    <span className="font-bold text-orange-600 dark:text-orange-400">
-                      {(parseFloat(budgetForm.goal) || 0) > 0
-                        ? Math.min(100, Math.round(((parseFloat(budgetForm.collected) || 0) / (parseFloat(budgetForm.goal) || 1)) * 100))
-                        : 0}%
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={() => setShowBudgetModal(false)}
-                    className="flex-1 py-3 px-4 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 font-semibold hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="flex-1 py-3 px-4 rounded-xl bg-orange-500 hover:bg-orange-600 dark:bg-orange-600 dark:hover:bg-orange-700 text-white font-bold transition-colors shadow-md shadow-orange-500/20"
-                  >
-                    Save Budget
                   </button>
                 </div>
               </form>
@@ -802,13 +608,8 @@ export function AdminDashboard() {
               </div>
 
               <div className="space-y-4 mb-6">
-                {receipts.map((receipt: Receipt) => (
+                {receipts.map((receipt) => (
                   <div key={receipt.id} className="flex items-start gap-4 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-600">
-                    {receipt.imageUrl && (
-                      <div className="w-12 h-12 rounded-lg bg-slate-200 dark:bg-slate-700 overflow-hidden shrink-0 ring-1 ring-slate-200 dark:ring-slate-600 transition-colors">
-                        <img src={receipt.imageUrl} alt="Receipt" className="w-full h-full object-cover" />
-                      </div>
-                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate transition-colors">{receipt.description}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400 truncate transition-colors">by {receipt.uploaderName} • {new Date(receipt.date).toLocaleDateString()}</p>

@@ -2,114 +2,41 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
 import { GraduationCap, LogOut, CheckCircle2, Clock, CalendarDays, Receipt as ReceiptIcon, ChevronRight, ChevronDown } from "lucide-react";
 import { motion } from "framer-motion";
-import { budgetData, eventData, Task } from "../data/mockData";
+import { eventData } from "../data/mockData";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
-
-const isDummyTask = (task: Task) => task.studentName.toLowerCase().startsWith("test");
-
-const parseSavedTasks = (value: string | null): Task[] => {
-  if (!value) return [];
-  try {
-    const parsed = JSON.parse(value) as Task[];
-    const filtered = parsed.filter(task => !isDummyTask(task));
-    if (filtered.length !== parsed.length) {
-      localStorage.setItem("sEEync_tasks", JSON.stringify(filtered));
-    }
-    return filtered;
-  } catch {
-    return [];
-  }
-};
+import { useTasks, Task } from "../../hooks/useTasks";
+import { useContributions } from "../../hooks/useContributions";
+import { useReceipts } from "../../hooks/useReceipts";
+import { useMaterials } from "../../hooks/useMaterials";
 
 export function StudentPortal() {
-  // Clear stale expense data immediately
-  localStorage.removeItem('sEEync_event_materials');
-  localStorage.removeItem('sEEync_receipts');
-  
   const navigate = useNavigate();
   const { user, logout } = useAuth();
   const location = useLocation();
   const state = location.state as { name?: string } | null;
   const studentName = user?.fullName || state?.name || "Juan de la Cruz";
+  const { tasks, updateTaskStatus, loading: tasksLoading } = useTasks();
+  const { contributions } = useContributions();
+  const { receipts } = useReceipts();
+  const { materials } = useMaterials();
   
-  useEffect(() => {
-    // Clean dummy members but keep real ones
-    const saved = localStorage.getItem('sEEync_members');
-    if (saved) {
-      try {
-        const members = JSON.parse(saved) as any[];
-        const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
-        const filtered = members.filter(m => !isDummyName(m.name));
-        if (filtered.length !== members.length) {
-          localStorage.setItem('sEEync_members', JSON.stringify(filtered));
-        }
-      } catch {}
-    }
-    // Clean dummy contributions
-    const savedContrib = localStorage.getItem('sEEync_contributions');
-    if (savedContrib) {
-      try {
-        const contribs = JSON.parse(savedContrib) as any[];
-        const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
-        const filtered = contribs.filter(c => !isDummyName(c.name));
-        if (filtered.length !== contribs.length) {
-          localStorage.setItem('sEEync_contributions', JSON.stringify(filtered));
-        }
-      } catch {}
-    }
-  }, []);
-  
-  const [tasks, setTasks] = useState<Task[]>(() => parseSavedTasks(localStorage.getItem("sEEync_tasks")));
-
   // Find student's task (mock matching logic)
   const myTasks = tasks.filter(t => t.studentName.toLowerCase().includes(studentName.toLowerCase().split(' ')[0]));
   const myTask = myTasks.length > 0 ? myTasks[0] : null;
 
   const progressPercent = tasks.length === 0 ? 0 : Math.round((tasks.filter(t => t.status === 'Done').length / tasks.length) * 100);
   
-  const getBudget = () => {
-    const defaultContributions: any[] = [];
-    const defaultReceipts: any[] = [];
-    const defaultMaterials: any[] = [];
-
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
-    const materialsData = JSON.parse(localStorage.getItem('sEEync_event_materials') || "null") || defaultMaterials;
-
-    return {
-      collected: contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0),
-      goal: materialsData.reduce((sum: number, m: any) => sum + ((m.price || 0) * (m.quantity || 0)), 0),
-      expenses: receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0)
-    };
+  const budget = {
+    collected: contributions.reduce((sum, c) => sum + c.amountPaid, 0),
+    goal: materials.reduce((sum, m) => sum + (m.price * m.quantity), 0),
+    expenses: receipts.reduce((sum, r) => sum + r.amount, 0)
   };
 
-  const [budget, setBudget] = useState(getBudget);
-
-  useEffect(() => {
-    setBudget(getBudget());
-    setTasks(parseSavedTasks(localStorage.getItem("sEEync_tasks")));
-  }, []);
-
-  const handleStatusChange = (taskId: string, newStatus: 'Pending' | 'In Progress' | 'Done') => {
-    if (taskId === "t-default") return;
-    const updatedTasks = tasks.map(t => t.id === taskId ? { ...t, status: newStatus } : t);
-    setTasks(updatedTasks);
-    localStorage.setItem("sEEync_tasks", JSON.stringify(updatedTasks));
-
-    const task = updatedTasks.find(t => t.id === taskId);
-    if (task) {
-      const activity = {
-        id: `act-${Date.now()}`,
-        type: 'task',
-        message: `updated their task "${task.taskDesc}" to ${newStatus}.`,
-        actor: studentName,
-        timestamp: Date.now(),
-      };
-      const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-      log.unshift(activity);
-      localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
-    }
+  const handleStatusChange = async (taskId: string, newStatus: 'Pending' | 'In Progress' | 'Done') => {
+    // The student portal should not have a default task anymore with real data
+    await updateTaskStatus(taskId, newStatus);
+    // TODO: Log activity if needed, using a dedicated hook
   };
 
   const remainingBalance = budget.collected - budget.expenses;
@@ -376,17 +303,7 @@ export function StudentPortal() {
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                   {(() => {
-                    // Get contributions data
-                    const contributionsStr = localStorage.getItem('sEEync_contributions') || '[]';
-                    let contributions: any[] = [];
-                    try {
-                      contributions = JSON.parse(contributionsStr);
-                    } catch {
-                      contributions = [];
-                    }
-                    
-                    // Find own contribution
-                    const ownContribution = contributions.find((c: any) => 
+                    const ownContribution = contributions.find(c => 
                       c.name.toLowerCase().includes(studentName.toLowerCase().split(' ')[0])
                     );
                     
@@ -395,9 +312,9 @@ export function StudentPortal() {
                         ...ownContribution,
                         isOwn: true
                       }] : []),
-                      ...contributions.filter((c: any) => 
+                      ...contributions.filter(c => 
                         !c.name.toLowerCase().includes(studentName.toLowerCase().split(' ')[0])
-                      ).map((c: any) => ({...c, isOwn: false}))
+                      ).map(c => ({...c, isOwn: false}))
                     ];
 
                     if (combined.length === 0) {

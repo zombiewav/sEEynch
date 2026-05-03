@@ -1,49 +1,19 @@
 import React, { useState, useEffect } from "react";
 import { User, Shield, Search, Plus, Copy, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-
-interface Member {
-  id: string;
-  name: string;
-  studentId: string;
-  role: 'Student' | 'Officer';
-  position?: string;
-  avatar: string; // URL or initials
-}
-
-const mockMembers: Member[] = [];
+import { useMembers, Member } from "../../hooks/useMembers";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Members() {
-  useEffect(() => {
-    // Clean dummy members but keep real ones
-    const saved = localStorage.getItem('sEEync_members');
-    if (saved) {
-      try {
-        const members = JSON.parse(saved) as Member[];
-        const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
-        const filtered = members.filter(m => !isDummyName(m.name));
-        if (filtered.length !== members.length) {
-          localStorage.setItem('sEEync_members', JSON.stringify(filtered));
-        }
-      } catch {}
-    }
-  }, []);
-  
-  const [members, setMembers] = useState<Member[]>(() => {
-    const saved = localStorage.getItem('sEEync_members');
-    return saved ? JSON.parse(saved) : mockMembers;
-  });
-  
-  useEffect(() => {
-    localStorage.setItem('sEEync_members', JSON.stringify(members));
-  }, [members]);
+  const { members, updateMemberRole, loading } = useMembers();
+  const { user } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [showQrModal, setShowQrModal] = useState(false);
   const [copied, setCopied] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
-  const inviteCode = "BSEE-1B-XYZ"; // This should ideally come from a shared context or props
+  const inviteCode = "BSEE-1B-XYZ"; // We can replace this with actual class data later!
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(inviteCode);
@@ -51,16 +21,22 @@ export default function Members() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleEditRole = () => {
+  const handleEditRole = async () => {
     if (!selectedMember) return;
+    
     const newRole = selectedMember.role === 'Student' ? 'Officer' : 'Student';
-    const updatedMember: Member = { 
-      ...selectedMember, 
-      role: newRole,
-      position: newRole === 'Officer' ? 'Class Officer' : undefined
-    };
-    setMembers(prev => prev.map(m => m.id === selectedMember.id ? updatedMember : m));
-    setSelectedMember(updatedMember);
+    
+    try {
+      await updateMemberRole(selectedMember.id, newRole);
+      // Update local selected member to reflect immediately in UI
+      setSelectedMember(prev => prev ? { 
+        ...prev, 
+        role: newRole,
+        position: newRole === 'Officer' ? 'Class Officer' : undefined
+      } : null);
+    } catch (error) {
+      console.error("Failed to update role:", error);
+    }
   };
 
   const filteredMembers = members.filter(member =>

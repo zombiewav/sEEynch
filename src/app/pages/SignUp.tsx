@@ -3,13 +3,12 @@ import { Link, useNavigate, useLocation } from "react-router";
 import { User, Hash, Mail, Lock, ArrowRight, ArrowLeft, MapPin, Calendar, BookOpen, ShieldCheck, Eye, EyeOff } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 export function SignUp() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { role?: string } | null;
-  const { login } = useAuth();
   const role = state?.role || "student"; // Default to student
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
@@ -83,22 +82,26 @@ export function SignUp() {
 
     setIsLoading(true);
     try {
-      // Mock network delay
-      await new Promise(resolve => setTimeout(resolve, 800));
-
-      const newUser = { ...formData, role };
-      const existingUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
-      existingUsers.push(newUser);
-      localStorage.setItem("sEEync_users", JSON.stringify(existingUsers));
-
-      // Log the user into the global context immediately
-      login({
-        fullName: formData.fullName,
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: formData.email,
-        role: role,
-        officerPosition: formData.officerPosition,
-        idNumber: formData.idNumber,
+        password: formData.password,
       });
+
+      if (authError) throw authError;
+
+      if (authData.user) {
+        const { error: profileError } = await supabase.from('profiles').insert([
+          {
+            id: authData.user.id,
+            full_name: formData.fullName,
+            student_id: formData.idNumber,
+            role: role,
+            officer_position: role === 'officer' ? formData.officerPosition : null,
+          }
+        ]);
+
+        if (profileError) throw profileError;
+      }
 
       // After successful creation, route users to their respective onboarding screens
       navigate(role === "officer" ? "/create-block" : "/join-block", { state: { name: formData.fullName, position: formData.officerPosition } });

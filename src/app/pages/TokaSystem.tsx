@@ -1,33 +1,17 @@
 import React, { useState, useEffect } from "react";
 import { ChevronDown, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-
-type TaskStatus = 'Pending' | 'In Progress' | 'Done';
-
-interface Task {
-  id: string;
-  studentName: string;
-  taskDesc: string;
-  status: TaskStatus;
-  dueDate: string;
-}
-
-const mockTasks: Task[] = [];
+import { useTasks, Task } from "../../hooks/useTasks";
+ import { useActivityLog } from "../../hooks/useActivityLog";
 
 export default function TokaSystem() {
   const { user } = useAuth();
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem("sEEync_tasks");
-    return saved ? JSON.parse(saved) : mockTasks;
-  });
+  const { tasks, addTask, updateTaskStatus, deleteTask } = useTasks();
+  const { addActivity } = useActivityLog();
   
   const [newTaskStudent, setNewTaskStudent] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
   const [newTaskDate, setNewTaskDate] = useState("");
-
-  useEffect(() => {
-    localStorage.setItem("sEEync_tasks", JSON.stringify(tasks));
-  }, [tasks]);
 
   // Derived state for the dashboard summaries
   const completedTasks = tasks.filter(t => t.status === 'Done').length;
@@ -35,58 +19,50 @@ export default function TokaSystem() {
   
   // Treat tasks as overdue if their due date is in the past and they are not done
   const today = new Date().toISOString().split('T')[0];
-  const overdueCount = tasks.filter(t => t.status !== 'Done' && t.dueDate < today).length;
+  const overdueCount = tasks.filter(t => t.status !== 'Done' && t.dueDate && t.dueDate < today).length;
 
-  const handleStatusChange = (id: string, newStatus: TaskStatus) => {
+  const handleStatusChange = async (id: string, newStatus: Task['status']) => {
     const task = tasks.find(t => t.id === id);
     if (!task) return;
 
-    setTasks(prev => prev.map(t => (t.id === id ? { ...t, status: newStatus } : t)));
+    try {
+      await updateTaskStatus(id, newStatus);
 
-    const activity = {
-      id: `act-${Date.now()}`,
-      type: 'task',
-      message: `updated the status of "${task.taskDesc}" to ${newStatus}.`,
-      actor: user?.fullName || 'Officer',
-      timestamp: Date.now(),
-    };
-    const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-    log.unshift(activity);
-    localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
-  };
-
-  const handleDeleteTask = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this task?")) {
-      setTasks(prev => prev.filter(t => t.id !== id));
+      await addActivity('task', `updated the status of "${task.taskDesc}" to ${newStatus}.`, user?.fullName || 'Officer');
+    } catch (error) {
+      console.error("Failed to update status:", error);
     }
   };
 
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleDeleteTask = async (id: string) => {
+    if (window.confirm("Are you sure you want to delete this task?")) {
+      try {
+        await deleteTask(id);
+      } catch (error) {
+        console.error("Failed to delete task:", error);
+      }
+    }
+  };
+
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskStudent.trim() || !newTaskDesc.trim()) return;
-    const newTask: Task = {
-      id: `t-${Date.now()}`,
-      studentName: newTaskStudent,
-      taskDesc: newTaskDesc,
-      status: 'Pending',
-      dueDate: newTaskDate || new Date().toISOString().split('T')[0]
-    };
-    setTasks([...tasks, newTask]);
-    setNewTaskStudent("");
-    setNewTaskDesc("");
-    setNewTaskDate("");
 
-    // Log activity
-    const activity = {
-      id: `act-${Date.now()}`,
-      type: 'task',
-      message: `assigned "${newTaskDesc}" to ${newTaskStudent}.`,
-      actor: user?.fullName || 'Officer',
-      timestamp: Date.now(),
-    };
-    const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-    log.unshift(activity);
-    localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
+    try {
+      await addTask({
+        studentName: newTaskStudent,
+        taskDesc: newTaskDesc,
+        status: 'Pending',
+        dueDate: newTaskDate || new Date().toISOString().split('T')[0]
+      });
+      setNewTaskStudent("");
+      setNewTaskDesc("");
+      setNewTaskDate("");
+
+      await addActivity('task', `assigned "${newTaskDesc}" to ${newTaskStudent}.`, user?.fullName || 'Officer');
+    } catch (error) {
+      console.error("Failed to add task:", error);
+    }
   };
 
   return (
@@ -170,20 +146,17 @@ export default function TokaSystem() {
                     <div className="text-slate-700 dark:text-slate-300 font-medium">{task.taskDesc}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className={`text-sm font-medium ${task.dueDate < today && task.status !== 'Done' ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
-                      {new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
+                    <div className={`text-sm font-medium ${task.dueDate && task.dueDate < today && task.status !== 'Done' ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-400'}`}>
+                      {task.dueDate 
+                        ? new Date(task.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+                        : 'No Date'}
                     </div>
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDeleteTask(task.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete Task">
-                      <Trash2 size={18} />
-                    </button>
                   </td>
                   <td className="px-6 py-4">
                     <div className="relative inline-block w-full max-w-[160px]">
                       <select 
                         value={task.status}
-                        onChange={(e) => handleStatusChange(task.id, e.target.value as TaskStatus)}
+                        onChange={(e) => handleStatusChange(task.id, e.target.value as Task['status'])}
                         className={`appearance-none w-full border font-bold text-sm rounded-xl px-4 py-2.5 pr-10 focus:outline-none focus:ring-2 focus:ring-offset-1 min-h-[44px] cursor-pointer transition-colors shadow-sm
                           ${task.status === 'Done' ? 'bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800/50 focus:ring-emerald-500' : 
                             task.status === 'In Progress' ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-800/50 focus:ring-orange-500' : 
@@ -197,6 +170,11 @@ export default function TokaSystem() {
                         <ChevronDown size={16} strokeWidth={3} />
                       </div>
                     </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <button onClick={() => handleDeleteTask(task.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete Task">
+                      <Trash2 size={18} />
+                    </button>
                   </td>
                 </tr>
               ))}

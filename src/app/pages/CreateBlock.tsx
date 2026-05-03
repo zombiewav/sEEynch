@@ -7,6 +7,7 @@ import {
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 const MOCK_CLASSES = [
   { id: 1, name: "BSEE 1-A", course: "Electrical Engineering", term: "2025-2026" },
@@ -57,11 +58,33 @@ export function CreateBlock() {
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const code = `${formData.courseName.split(' ')[0]}-${formData.yearSection}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
-    setGeneratedCode(code);
-    setIsCreated(true);
+    if (!formData.courseName || !formData.yearSection || !formData.academicYear) return;
+
+    try {
+      // 1. Generate a unique invite code
+      const code = `${formData.courseName.split(' ')[0].toUpperCase()}-${formData.yearSection}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+      
+      // 2. Insert the new class into the 'classes' table
+      const { data: classData, error: classError } = await supabase
+        .from('classes')
+        .insert({ ...formData, invite_code: code })
+        .select()
+        .single();
+
+      if (classError) throw classError;
+
+      // 3. Update the officer's profile to link them to this new class
+      const { error: profileError } = await supabase.from('profiles').update({ class_id: classData.id }).eq('id', user!.id);
+      if (profileError) throw profileError;
+
+      setGeneratedCode(code);
+      setIsCreated(true);
+    } catch (error) {
+      console.error("Error creating class space:", error);
+      // You might want to set an error state here to show in the UI
+    }
   };
 
   const handleCopyCode = () => {

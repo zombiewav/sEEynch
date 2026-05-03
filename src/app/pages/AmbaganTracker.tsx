@@ -1,59 +1,46 @@
 import React, { useState, useEffect } from "react";
-import { CheckCircle2, Trash2, Info } from "lucide-react";
+import { CheckCircle2, Info } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
-
-type PaymentStatus = 'Paid' | 'Partially Paid' | 'Unpaid';
-
-interface Contribution {
-  id: string;
-  name: string;
-  status: PaymentStatus;
-  amountPaid: number;
-  requiredAmount: number;
-}
-
-const mockContributions: Contribution[] = [];
-
-const clearDummyData = () => {
-  // Clean dummy contributions
-  const saved = localStorage.getItem('sEEync_contributions');
-  if (saved) {
-    try {
-      const contribs = JSON.parse(saved) as Contribution[];
-      const isDummyName = (name: string) => /^(Juan de la Cruz|Maria Clara|Jose Rizal|Andres Bonifacio|Gabriela Silang)$/i.test(name);
-      const filtered = contribs.filter(c => !isDummyName(c.name));
-      if (filtered.length !== contribs.length) {
-        localStorage.setItem('sEEync_contributions', JSON.stringify(filtered));
-      }
-    } catch {}
-  }
-};
+import { useContributions } from "../../hooks/useContributions";
+import { useActivityLog } from "../../hooks/useActivityLog";
 
 export default function AmbaganTracker() {
   const { user } = useAuth();
-  useEffect(() => {
-    clearDummyData();
-  }, []);
-  const [contributions, setContributions] = useState<Contribution[]>(() => {
-    return [];
-  });
+  const { contributions, updatePayment, syncAllRequiredAmounts, markAllPaid } = useContributions();
+  const { addActivity } = useActivityLog();
+  
+  const [localAmounts, setLocalAmounts] = useState<Record<string, string>>({});
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('sEEync_contributions', JSON.stringify(contributions));
+    setLocalAmounts(prev => {
+      const next = { ...prev };
+      let changed = false;
+      contributions.forEach(c => {
+        // Only update local input if not currently focused by user
+        if (prev[c.id] === undefined || (document.activeElement?.id !== `input-${c.id}` && Number(prev[c.id]) !== c.amountPaid)) {
+          next[c.id] = c.amountPaid.toString();
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+
+    // Mirror to local storage so other components keep working during transition
     const totalCollected = contributions.reduce((sum, c) => sum + c.amountPaid, 0);
     const totalExpected = contributions.reduce((sum, c) => sum + c.requiredAmount, 0);
+    localStorage.setItem('sEEync_contributions', JSON.stringify(contributions));
     localStorage.setItem('sEEync_budget_collected', totalCollected.toString());
     localStorage.setItem('sEEync_budget_goal', totalExpected.toString());
   }, [contributions]);
 
   const getExpectedExpenses = () => {
-    localStorage.removeItem('sEEync_event_materials');
-    return 0;
+    return parseFloat(localStorage.getItem('sEEync_expected_expenses') || "0") || 0;
   };
   
   const getActualExpenses = () => {
-    localStorage.removeItem('sEEync_receipts');
-    return 0;
+    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || [];
+    return receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
   };
 
   const expectedExpenses = getExpectedExpenses();
@@ -62,46 +49,17 @@ export default function AmbaganTracker() {
 
   useEffect(() => {
     const currentRequired = contributions[0]?.requiredAmount;
-    if (currentRequired !== undefined && currentRequired !== autoAmbagan) {
-        const activity = {
-            id: `act-${Date.now()}`,
-            type: 'payment',
-            message: `updated the required ambagan to ₱${autoAmbagan} per student.`,
-            actor: user?.fullName || 'System',
-            timestamp: Date.now(),
-        };
-        const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-        log.unshift(activity);
-        localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
+    if (currentRequired !== undefined && currentRequired !== autoAmbagan && autoAmbagan > 0 && !isSyncing) {
+        setIsSyncing(true);
+        syncAllRequiredAmounts(autoAmbagan).then(() => {
+           addActivity('payment', `updated the required ambagan to ₱${autoAmbagan} per student.`, user?.fullName || 'System');
+        }).finally(() => setIsSyncing(false));
     }
+  }, [autoAmbagan, contributions, isSyncing, syncAllRequiredAmounts, user?.fullName]);
 
-    // Automatically sync everyone's required amount to the calculated Ambagan
-    setContributions(prev => {
-      let changed = false;
-      const updated = prev.map(c => {
-        if (c.requiredAmount !== autoAmbagan) {
-          changed = true;
-          let newStatus: PaymentStatus = 'Unpaid';
-          if (c.amountPaid >= autoAmbagan && autoAmbagan > 0) newStatus = 'Paid';
-          else if (c.amountPaid > 0) newStatus = 'Partially Paid';
-          else if (autoAmbagan === 0 && c.amountPaid === 0) newStatus = 'Paid';
-          return { ...c, requiredAmount: autoAmbagan, status: newStatus };
-        }
-        return c;
-      });
-      return changed ? updated : prev;
-    });
-  }, [autoAmbagan, user?.fullName]);
-
-  const handleMarkAllCleared = () => {
+  const handleMarkAllCleared = async () => {
     if(window.confirm("Are you sure you want to mark everyone as fully paid?")) {
-      setContributions(prev => prev.map(c => ({ ...c, amountPaid: c.requiredAmount, status: 'Paid' })));
-    }
-  };
-
-  const handleDeleteContribution = (id: string) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
-      setContributions(prev => prev.filter(c => c.id !== id));
+      await markAllPaid();
     }
   };
 
@@ -110,36 +68,17 @@ export default function AmbaganTracker() {
   const totalExpected = contributions.reduce((sum, c) => sum + c.requiredAmount, 0);
   const totalRemaining = totalExpected - totalCollected;
 
-  // Automatically adjust status based on the inputted amount
-  const handleAmountChange = (id: string, newAmountStr: string) => {
+  const handleAmountSubmit = async (id: string, newAmountStr: string) => {
     const newAmount = parseInt(newAmountStr) || 0;
-    
-    setContributions(prev => prev.map(c => {
-      if (c.id !== id) return c;
-      
-      let newStatus: PaymentStatus = 'Unpaid';
-      if (newAmount >= c.requiredAmount) {
-        newStatus = 'Paid';
-      } else if (newAmount > 0) {
-        newStatus = 'Partially Paid';
-      }
-
-      return { ...c, amountPaid: newAmount, status: newStatus };
-    }));
-
-    // Log activity
     const student = contributions.find(c => c.id === id);
-    if (!student) return;
-    const activity = {
-      id: `act-${Date.now()}`,
-      type: 'payment',
-      message: `recorded a payment of ₱${newAmount} for ${student.name}.`,
-      actor: user?.fullName || 'Officer',
-      timestamp: Date.now(),
-    };
-    const log = JSON.parse(localStorage.getItem('sEEync_activity_log') || '[]');
-    log.unshift(activity);
-    localStorage.setItem('sEEync_activity_log', JSON.stringify(log.slice(0, 50)));
+    if (!student || student.amountPaid === newAmount) return;
+    
+    try {
+      await updatePayment(id, newAmount, student.requiredAmount);
+      await addActivity('payment', `recorded a payment of ₱${newAmount} for ${student.name}.`, user?.fullName || 'Officer');
+    } catch (error) {
+      console.error("Failed to update payment:", error);
+    }
   };
 
   return (
@@ -203,7 +142,6 @@ export default function AmbaganTracker() {
                 <th className="px-6 py-4 font-semibold">Status</th>
                 <th className="px-6 py-4 font-semibold">Amount Paid (₱)</th>
                 <th className="px-6 py-4 font-semibold">Balance</th>
-                <th className="px-6 py-4 font-semibold text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
@@ -224,22 +162,19 @@ export default function AmbaganTracker() {
                     <div className="relative max-w-[140px]">
                       <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 dark:text-slate-400 font-medium">₱</span>
                       <input 
+                        id={`input-${student.id}`}
                         type="number" 
                         min="0"
                         max={student.requiredAmount}
-                        value={student.amountPaid || ''}
-                        onChange={(e) => handleAmountChange(student.id, e.target.value)}
+                        value={localAmounts[student.id] ?? ''}
+                        onChange={(e) => setLocalAmounts(prev => ({...prev, [student.id]: e.target.value}))}
+                        onBlur={(e) => handleAmountSubmit(student.id, e.target.value)}
                         className="w-full pl-8 pr-4 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400 text-slate-900 dark:text-slate-100 font-medium transition-colors"
                       />
                     </div>
                   </td>
                   <td className="px-6 py-4 font-medium text-slate-600 dark:text-slate-400">
                   ₱{Math.max(0, student.requiredAmount - student.amountPaid).toLocaleString()}
-                  </td>
-                  <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDeleteContribution(student.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete Record">
-                      <Trash2 size={18} />
-                    </button>
                   </td>
                 </tr>
               ))}

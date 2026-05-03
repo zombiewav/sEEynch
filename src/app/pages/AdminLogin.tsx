@@ -3,11 +3,10 @@ import { useNavigate, Link } from "react-router";
 import { ChevronRight, LogIn, ArrowLeft, Eye, EyeOff } from "lucide-react";
 import { motion } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
-import { useAuth, type User } from "../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 export function AdminLogin() {
   const navigate = useNavigate();
-  const { login } = useAuth();
   const [adminUser, setAdminUser] = useState("");
   const [adminPass, setAdminPass] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -20,18 +19,26 @@ export function AdminLogin() {
     if (adminUser && adminPass) {
       setIsLoading(true);
       try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        const storedUsers = JSON.parse(localStorage.getItem("sEEync_users") || "[]");
-        const user = storedUsers.find(
-          (u: Record<string, any>) => u.email === adminUser && u.password === adminPass && u.role === "officer"
-        );
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email: adminUser,
+          password: adminPass,
+        });
+        if (signInError) throw signInError;
 
-        if (user) {
-          login(user as User);
-          navigate("/admin", { state: { name: user.fullName, position: user.officerPosition } });
-        } else {
-          throw new Error("Invalid email or password. Please try again.");
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('role, full_name, officer_position')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profileError) throw profileError;
+
+        if (profile.role !== 'officer') {
+          await supabase.auth.signOut();
+          throw new Error("Unauthorized. This portal is for officers only.");
         }
+
+        navigate("/admin", { state: { name: profile.full_name, position: profile.officer_position } });
       } catch (err: any) {
         setError(err.message || "Invalid email or password.");
       } finally {
