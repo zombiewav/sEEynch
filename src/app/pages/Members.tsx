@@ -3,6 +3,7 @@ import { User, Shield, Search, Plus, Copy, Check, X } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { useMembers, Member } from "../../hooks/useMembers";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 export default function Members() {
   const { members, updateMemberRole, loading } = useMembers();
@@ -13,7 +14,36 @@ export default function Members() {
   const [copied, setCopied] = useState(false);
   const [selectedMember, setSelectedMember] = useState<Member | null>(null);
 
-  const inviteCode = "BSEE-1B-XYZ"; // We can replace this with actual class data later!
+  // 1. Change inviteCode to a state variable so React can update it
+  const [inviteCode, setInviteCode] = useState("Loading...");
+
+  // 2. Fetch the real code from Supabase as soon as the component loads
+  useEffect(() => {
+    const fetchInviteCode = async () => {
+      // If the user doesn't have a class yet, do nothing
+      if (!user?.classId) return; 
+
+      try {
+        const { data, error } = await supabase
+          .from('classes')
+          .select('invite_code')
+          .eq('id', user.classId)
+          .single();
+
+        if (error) throw error;
+        
+        // Update the screen with the real code!
+        if (data) {
+          setInviteCode(data.invite_code);
+        }
+      } catch (error) {
+        console.error("Error fetching invite code:", error);
+        setInviteCode("ERROR-FETCHING-CODE");
+      }
+    };
+
+    fetchInviteCode();
+  }, [user?.classId]);
 
   const handleCopyCode = () => {
     navigator.clipboard.writeText(inviteCode);
