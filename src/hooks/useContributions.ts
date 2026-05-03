@@ -43,12 +43,12 @@ export function useContributions() {
       if (contribsError) throw contribsError;
 
       // 3. Auto-generate records for missing students
-      const missingProfiles = profiles?.filter(p => !contribs?.some(c => c.name === p.full_name)) || [];
+      const missingProfiles = profiles?.filter(p => !contribs?.some(c => c.student_name === p.full_name)) || [];
       
       if (missingProfiles.length > 0) {
         const inserts = missingProfiles.map(p => ({
           class_id: user.classId,
-          name: p.full_name,
+          student_name: p.full_name,
           status: 'Unpaid',
           amount_paid: 0,
           required_amount: contribs && contribs.length > 0 ? contribs[0].required_amount : 0
@@ -73,7 +73,7 @@ export function useContributions() {
   const formatAndSet = (data: any[]) => {
     const formatted: Contribution[] = data.map(c => ({
       id: c.id,
-      name: c.name,
+      name: c.student_name,
       status: c.status,
       amountPaid: Number(c.amount_paid),
       requiredAmount: Number(c.required_amount)
@@ -129,14 +129,14 @@ export function useContributions() {
     // Fetch existing contributions to preserve their current payments and IDs
     const { data: currentContribs } = await supabase
       .from('contributions')
-      .select('id, name, amount_paid')
+      .select('id, student_name, amount_paid')
       .eq('class_id', user.classId);
       
     const existingContribs = currentContribs || [];
 
     // 3 & 4. Map over fetched students and upsert
     const updates = students.map(student => {
-      const existing = existingContribs.find(c => c.name === student.full_name);
+      const existing = existingContribs.find(c => c.student_name === student.full_name);
       const amountPaid = existing ? Number(existing.amount_paid) : 0;
       
       // Determine new status based on any existing payments
@@ -148,7 +148,7 @@ export function useContributions() {
       return {
         ...(existing ? { id: existing.id } : {}), // Include ID to properly upsert if it exists
         class_id: user.classId,
-        name: student.full_name,
+        student_name: student.full_name,
         amount_paid: amountPaid,
         required_amount: amountPerStudent,
         status: newStatus
@@ -163,7 +163,7 @@ export function useContributions() {
   
   const markAllPaid = async () => {
      if (!user?.classId || contributions.length === 0) return;
-     const updates = contributions.map(c => ({ id: c.id, class_id: user.classId, name: c.name, amount_paid: c.requiredAmount, required_amount: c.requiredAmount, status: 'Paid' }));
+     const updates = contributions.map(c => ({ id: c.id, class_id: user.classId, student_name: c.name, amount_paid: c.requiredAmount, required_amount: c.requiredAmount, status: 'Paid' }));
      const { error } = await supabase.from('contributions').upsert(updates);
      if (error) throw error;
   }
