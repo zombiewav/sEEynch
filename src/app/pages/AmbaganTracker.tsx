@@ -151,12 +151,26 @@ export default function AmbaganTracker() {
                     <div className="font-medium text-slate-900 dark:text-slate-100">{student.name}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold tracking-wider uppercase shadow-sm
-                      ${student.status === 'Paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 
-                        student.status === 'Partially Paid' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 
-                        'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-                      {student.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold tracking-wider uppercase shadow-sm
+                        ${student.status === 'Paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 
+                          student.status === 'Pending Verification' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse' :
+                          student.status === 'Partially Paid' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 
+                          'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                        {student.status}
+                      </span>
+                      {student.status === 'Pending Verification' && (
+                        <button 
+                          onClick={() => {
+                            handleAmountSubmit(student.id, student.requiredAmount.toString());
+                            setLocalAmounts(prev => ({...prev, [student.id]: student.requiredAmount.toString()}));
+                          }} 
+                          className="text-xs bg-emerald-500 hover:bg-emerald-600 text-white px-2 py-1 rounded shadow-sm font-bold transition-colors"
+                        >
+                          Verify
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="relative max-w-[140px]">

@@ -17,7 +17,7 @@ export function StudentPortal() {
   const state = location.state as { name?: string } | null;
   const studentName = user?.fullName || state?.name || "Juan de la Cruz";
   const { tasks, updateTaskStatus, loading: tasksLoading } = useTasks();
-  const { contributions } = useContributions();
+  const { contributions, markAsPending } = useContributions();
   const { receipts } = useReceipts();
   const { materials } = useMaterials();
   
@@ -337,6 +337,7 @@ export function StudentPortal() {
                         <td className="px-6 py-4">
                           <span className={`inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold tracking-wider uppercase shadow-sm
                             ${contribution.status === 'Paid' ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400' : 
+                            contribution.status === 'Pending Verification' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400 animate-pulse' :
                               contribution.status === 'Partially Paid' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 
                               'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
                             {contribution.status}
@@ -345,8 +346,18 @@ export function StudentPortal() {
                         <td className="px-6 py-4 text-right font-mono font-bold text-slate-900 dark:text-slate-100">
                           ₱{contribution.amountPaid?.toLocaleString() || '0'}
                         </td>
-                        <td className="px-6 py-4 text-right font-mono font-bold text-slate-600 dark:text-slate-400">
-                          ₱{Math.max(0, (contribution.requiredAmount || 0) - (contribution.amountPaid || 0)).toLocaleString()}
+                      <td className="px-6 py-4 text-right font-mono text-slate-600 dark:text-slate-400">
+                        <div className="flex flex-col items-end gap-2">
+                          <span className="font-bold">₱{Math.max(0, (contribution.requiredAmount || 0) - (contribution.amountPaid || 0)).toLocaleString()}</span>
+                          {contribution.isOwn && contribution.status !== 'Paid' && contribution.status !== 'Pending Verification' && (
+                            <button 
+                              onClick={() => markAsPending(contribution.id)}
+                              className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded-lg font-sans font-bold shadow-sm transition-colors"
+                            >
+                              Notify "I Paid"
+                            </button>
+                          )}
+                        </div>
                         </td>
                       </tr>
                     ));

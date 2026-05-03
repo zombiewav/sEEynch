@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../app/contexts/AuthContext';
 
-export type PaymentStatus = 'Paid' | 'Partially Paid' | 'Unpaid';
+export type PaymentStatus = 'Paid' | 'Partially Paid' | 'Unpaid' | 'Pending Verification';
 
 export interface Contribution {
   id: string;
@@ -120,5 +120,11 @@ export function useContributions() {
      const { error } = await supabase.from('contributions').upsert(updates);
      if (error) throw error;
   }
-  return { contributions, loading, updatePayment, syncAllRequiredAmounts, markAllPaid };
+
+  const markAsPending = async (id: string) => {
+    const { error } = await supabase.from('contributions').update({ status: 'Pending Verification' }).eq('id', id);
+    if (error) throw error;
+  };
+
+  return { contributions, loading, updatePayment, syncAllRequiredAmounts, markAllPaid, markAsPending };
 }
