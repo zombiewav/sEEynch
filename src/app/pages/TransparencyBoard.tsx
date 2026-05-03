@@ -15,6 +15,7 @@ export default function TransparencyBoard() {
   const [newDesc, setNewDesc] = useState("");
   const [newAmount, setNewAmount] = useState("");
   const [newCategory, setNewCategory] = useState("Miscellaneous");
+  const [customCategory, setCustomCategory] = useState(""); // <-- Add this for "Others"
 
   const handleClearRecords = async () => {
     if(window.confirm("Are you sure you want to clear all expense records?")) {
@@ -31,9 +32,26 @@ export default function TransparencyBoard() {
   const handleAddExpense = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newDesc.trim() || !newAmount) return;
-    await addReceipt(newDesc, parseFloat(newAmount), newCategory, new Date().toISOString().split('T')[0]);
-    setNewDesc("");
-    setNewAmount("");
+
+    // Use the custom category if "Others" is selected, otherwise use the dropdown value
+    const categoryToSave = newCategory === "Others" ? customCategory : newCategory;
+
+    try {
+      await addReceipt(
+        newDesc, 
+        parseFloat(newAmount), 
+        categoryToSave || "Miscellaneous", 
+        new Date().toISOString().split('T')[0]
+      );
+      
+      // Reset everything
+      setNewDesc("");
+      setNewAmount("");
+      setCustomCategory("");
+      setNewCategory("Miscellaneous");
+    } catch (error) {
+      console.error("Failed to add expense:", error);
+    }
   };
 
   return (
@@ -126,17 +144,38 @@ export default function TransparencyBoard() {
         </div>
 
         {/* Add New Expense Form */}
-        <form onSubmit={handleAddExpense} className="p-4 sm:p-6 border-b border-gray-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-3 transition-colors">
-          <input type="text" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Expense description" className="flex-[2] px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100" />
-          <input type="number" min="0" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="Amount (₱)" className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100" />
-          <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100">
-            <option value="Venue">Venue</option>
-            <option value="Food & Drinks">Food & Drinks</option>
-            <option value="Materials">Materials</option>
-            <option value="Logistics">Logistics</option>
-            <option value="Miscellaneous">Miscellaneous</option>
-          </select>
-          <button type="submit" className="bg-orange-600 hover:bg-orange-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-orange-600/20 whitespace-nowrap"><Plus size={16} /> Log Expense</button>
+        <form onSubmit={handleAddExpense} className="p-4 sm:p-6 border-b border-gray-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col gap-3 transition-colors">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input type="text" value={newDesc} onChange={(e) => setNewDesc(e.target.value)} placeholder="Expense description" className="flex-[2] px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100" required />
+            <input type="number" min="0" step="0.01" value={newAmount} onChange={(e) => setNewAmount(e.target.value)} placeholder="Amount (₱)" className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100" required />
+            
+            <select value={newCategory} onChange={(e) => setNewCategory(e.target.value)} className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-slate-900 dark:text-slate-100">
+              <option value="Venue">Venue</option>
+              <option value="Food & Drinks">Food & Drinks</option>
+              <option value="Materials">Materials</option>
+              <option value="Logistics">Logistics</option>
+              <option value="Miscellaneous">Miscellaneous</option>
+              <option value="Others">Others</option> {/* <-- Added Others */}
+            </select>
+          </div>
+
+          {/* Conditional Input for "Others" */}
+          {newCategory === "Others" && (
+            <div className="animate-in slide-in-from-top-2 duration-200">
+              <input 
+                type="text" 
+                value={customCategory} 
+                onChange={(e) => setCustomCategory(e.target.value)} 
+                placeholder="Specify other reason..." 
+                className="w-full px-4 py-2.5 bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-800/50 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-orange-500 text-slate-900 dark:text-slate-100"
+                required
+              />
+            </div>
+          )}
+
+          <button type="submit" className="w-full sm:w-auto self-end bg-orange-600 hover:bg-orange-700 text-white px-8 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-orange-600/20 whitespace-nowrap">
+            <Plus size={16} /> Log Expense
+          </button>
         </form>
 
         <div className="overflow-x-auto">
