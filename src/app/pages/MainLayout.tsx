@@ -9,13 +9,14 @@ import {
   Users, 
   CheckSquare, 
   CreditCard, 
-  Receipt, 
+  Receipt,
+  DoorOpen, 
   Calendar
 } from "lucide-react";
 
 export function MainLayout() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, logout } = useAuth();
+  const { user, logout, leaveClass } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -23,6 +24,12 @@ export function MainLayout() {
   const adminInitials = adminName.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2);
 
   const handleLogout = () => { logout(); navigate("/"); };
+
+  const handleLeaveClass = async () => {
+    if (window.confirm("Are you sure you want to leave this class? You will need a new invite code to join another one.")) {
+      await leaveClass();
+    }
+  };
 
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
@@ -109,6 +116,10 @@ export function MainLayout() {
           </div>
           
           <div className="flex items-center gap-4 ml-auto">
+            <button onClick={handleLeaveClass} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg">
+              <DoorOpen size={16} />
+              <span className="hidden md:inline">Leave</span>
+            </button>
             <ThemeToggle />
             <div className="flex items-center gap-3 pl-4 border-l border-gray-200 dark:border-slate-700 transition-colors">
               <div className="w-9 h-9 rounded-full bg-orange-100 dark:bg-orange-500/20 text-orange-600 dark:text-orange-500 flex items-center justify-center font-bold text-sm shrink-0">

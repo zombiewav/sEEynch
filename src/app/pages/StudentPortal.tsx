@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation, Link } from "react-router";
-import { GraduationCap, LogOut, CheckCircle2, Clock, CalendarDays, Receipt as ReceiptIcon, ChevronRight, ChevronDown } from "lucide-react";
+import { GraduationCap, LogOut, CheckCircle2, Clock, CalendarDays, Receipt as ReceiptIcon, ChevronRight, ChevronDown, DoorOpen } from "lucide-react";
 import { motion } from "framer-motion";
 import { eventData } from "../data/mockData";
 import { ThemeToggle } from "../components/ThemeToggle";
@@ -12,7 +12,7 @@ import { useMaterials } from "../../hooks/useMaterials";
 
 export function StudentPortal() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, leaveClass } = useAuth();
   const location = useLocation();
   const state = location.state as { name?: string } | null;
   const studentName = user?.fullName || state?.name || "Juan de la Cruz";
@@ -39,6 +39,12 @@ export function StudentPortal() {
     // TODO: Log activity if needed, using a dedicated hook
   };
 
+  const handleLeaveClass = async () => {
+    if (window.confirm("Are you sure you want to leave this class? You will need a new invite code to join another one.")) {
+      await leaveClass();
+    }
+  };
+
   const remainingBalance = budget.collected - budget.expenses;
   const daysUntilEvent = Math.floor((new Date(eventData.date).getTime() - new Date().getTime()) / (1000 * 3600 * 24));
 
@@ -61,6 +67,10 @@ export function StudentPortal() {
             </div>
             <div className="flex items-center gap-3">
               <ThemeToggle />
+              <button onClick={handleLeaveClass} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg">
+                <DoorOpen size={16} />
+                <span className="hidden sm:inline">Leave</span>
+              </button>
               <Link to="/deadlines" state={{ name: studentName }} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-blue-50 dark:hover:bg-blue-950 rounded-lg">
                 <CalendarDays size={16} />
                 <span className="hidden sm:inline">Deadlines</span>

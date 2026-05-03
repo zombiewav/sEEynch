@@ -14,7 +14,8 @@ import {
   Receipt as ReceiptIcon,
   X,
   Copy,
-  Check
+  Check,
+  DoorOpen
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { eventData, TaskStatus } from "../data/mockData";
@@ -28,7 +29,7 @@ import { useMaterials } from "../../hooks/useMaterials";
 
 export function AdminDashboard() {
   const navigate = useNavigate();
-  const { user, logout } = useAuth();
+  const { user, logout, leaveClass } = useAuth();
   const location = useLocation();
   const state = location.state as { name?: string; position?: string } | null;
   const adminName = user?.fullName || state?.name || "Officer";
@@ -115,6 +116,12 @@ export function AdminDashboard() {
     } catch (error) {
       console.error("Failed to add task:", error);
       setTaskFormError((error as Error).message);
+    }
+  };
+
+  const handleLeaveClass = async () => {
+    if (window.confirm("Are you sure you want to leave this class? You will need a new invite code to join another one.")) {
+      await leaveClass();
     }
   };
 
@@ -333,6 +340,10 @@ export function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <button onClick={handleLeaveClass} className="flex items-center gap-2 text-slate-500 dark:text-slate-400 hover:text-red-600 dark:hover:text-red-400 font-bold uppercase tracking-wider text-xs transition-colors py-2 px-3 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg">
+                <DoorOpen size={16} />
+                <span className="hidden md:inline">Leave</span>
+              </button>
               <ThemeToggle />
               <button className="relative p-2 text-slate-400 dark:text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded-full hover:bg-slate-100 dark:hover:bg-slate-700">
                 <Bell size={24} />
