@@ -19,6 +19,7 @@ interface AuthContextType {
   isLoading: boolean;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  leaveClass: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -91,7 +92,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  return <AuthContext.Provider value={{ user, session, isLoading, logout, refreshProfile }}>{children}</AuthContext.Provider>;
+  const leaveClass = async () => {
+    if (!user) return;
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ class_id: null, role: 'student', officer_position: null })
+        .eq('id', user.id);
+      if (error) throw error;
+      
+      await refreshProfile();
+    } catch (error) {
+      console.error('Error leaving class:', error);
+    }
+  };
+
+  return <AuthContext.Provider value={{ user, session, isLoading, logout, refreshProfile, leaveClass }}>{children}</AuthContext.Provider>;
 }
 
 export const useAuth = () => {
