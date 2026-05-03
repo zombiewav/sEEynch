@@ -8,27 +8,22 @@ import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../../lib/supabase";
+import { useClasses, Class } from "../../hooks/useClasses";
 
-const MOCK_CLASSES = [
-  { id: 1, name: "BSEE 1-A", course: "Electrical Engineering", term: "2025-2026" },
-  { id: 2, name: "BSEE 1-B", course: "Electrical Engineering", term: "2025-2026" },
-  { id: 3, name: "BSCS 2-A", course: "Computer Science", term: "2025-2026" },
-  { id: 4, name: "BSIT 3-C", course: "Information Technology", term: "2025-2026" },
-  { id: 5, name: "BSCE 1-A", course: "Civil Engineering", term: "2025-2026" },
-];
 
 export function CreateBlock() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   
   const state = location.state as { name?: string; position?: string } | null;
   const officerName = user?.fullName || state?.name || "Officer";
   const officerPosition = user?.officerPosition || state?.position || "Class Officer";
 
+  const { classes, loading: classesLoading } = useClasses();
   const [viewMode, setViewMode] = useState<'join' | 'create'>('join');
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedClass, setSelectedClass] = useState<typeof MOCK_CLASSES[0] | null>(null);
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [inviteCode, setInviteCode] = useState("");
   
   const [isCreated, setIsCreated] = useState(false);
@@ -41,7 +36,7 @@ export function CreateBlock() {
     academicYear: "",
   });
 
-  const filteredClasses = MOCK_CLASSES.filter(c => 
+  const filteredClasses = classes.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.course.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -51,10 +46,25 @@ export function CreateBlock() {
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleVerifyJoin = (e: React.FormEvent) => {
+  const handleVerifyJoin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inviteCode.trim()) {
-      navigate("/admin", { state: { name: officerName, position: officerPosition } });
+    if (inviteCode.trim() && selectedClass && user) {
+      try {
+        // In a real app, you'd verify the invite code against the selected class.
+        // For now, we'll just associate the officer with the class.
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({ class_id: selectedClass.id })
+          .eq('id', user.id);
+
+        if (profileError) throw profileError;
+
+        await refreshProfile(); 
+        navigate("/admin", { state: { name: officerName, position: officerPosition } });
+      } catch (error) {
+        console.error("Failed to join class:", error);
+        // You should set an error state here to show in the modal UI
+      }
     }
   };
 
