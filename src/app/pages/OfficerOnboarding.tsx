@@ -14,24 +14,19 @@ import {
   X
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
+import { useClasses, Class } from "../../hooks/useClasses";
 
-const MOCK_CLASSES = [
-  { id: 1, name: "BSEE 1-A", course: "Electrical Engineering", term: "2025-2026" },
-  { id: 2, name: "BSEE 1-B", course: "Electrical Engineering", term: "2025-2026" },
-  { id: 3, name: "BSCS 2-A", course: "Computer Science", term: "2025-2026" },
-  { id: 4, name: "BSIT 3-C", course: "Information Technology", term: "2025-2026" },
-  { id: 5, name: "BSCE 1-A", course: "Civil Engineering", term: "2025-2026" },
-];
 
 export function OfficerOnboarding() {
   const navigate = useNavigate();
+  const { classes } = useClasses();
   
   // Main States
   const [viewMode, setViewMode] = useState<'join' | 'create'>('join');
   
   // Join View States
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedClass, setSelectedClass] = useState<typeof MOCK_CLASSES[0] | null>(null);
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [inviteCode, setInviteCode] = useState("");
   
   // Create View States
@@ -44,7 +39,7 @@ export function OfficerOnboarding() {
     academicYear: "",
   });
 
-  const filteredClasses = MOCK_CLASSES.filter(c => 
+  const filteredClasses = classes.filter(c => 
     c.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     c.course.toLowerCase().includes(searchQuery.toLowerCase())
   );
