@@ -65,15 +65,13 @@ export default function EventDashboard() {
     if (!newTodo.trim()) return;
     
     try {
-      await addTodo(newTodo);
+      await addTodo(newTodo); // Sending desc to useTodos hook
+      const todoText = newTodo;
+      setNewTodo("");
+      await addActivity('event', `added a new to-do: "${todoText}"`, user?.fullName || 'Officer');
     } catch (error) {
-      console.error(error);
+      console.error("Failed to add task:", error);
     }
-    
-    const todoText = newTodo;
-    setNewTodo("");
-
-    await addActivity('event', `added a new to-do: "${todoText}"`, user?.fullName || 'Officer');
   };
 
   const handleAddMaterial = async (e: React.FormEvent) => {
@@ -83,15 +81,13 @@ export default function EventDashboard() {
     
     try {
       await addMaterial(newMaterialName, price);
+      const matName = newMaterialName;
+      setNewMaterialName("");
+      setNewMaterialPrice("");
+      await addActivity('event', `added a new material: "${matName}"`, user?.fullName || 'Officer');
     } catch (error) {
-      console.error(error);
+      console.error("Failed to add material:", error);
     }
-    
-    const matName = newMaterialName;
-    setNewMaterialName("");
-    setNewMaterialPrice("");
-
-    await addActivity('event', `added a new material: "${matName}"`, user?.fullName || 'Officer');
   };
 
   const handleMaterialSubmit = async (id: string, field: 'price' | 'quantity', value: string) => {
@@ -103,19 +99,17 @@ export default function EventDashboard() {
   };
 
   // Derived state computations
-  const completedTodos = todos.filter(t => t.isDone).length;
+  const completedTodos = todos.filter(t => t.is_done).length;
   const todoProgress = todos.length > 0 ? Math.round((completedTodos / todos.length) * 100) : 0;
   const grandTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
   
   const getCollectedFunds = () => {
-    const defaultContributions: any[] = [];
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
+    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "[]");
     return contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
   };
 
   const getActualExpenses = () => {
-    const defaultReceipts: any[] = [];
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
+    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "[]");
     return receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
   };
 
@@ -164,14 +158,14 @@ export default function EventDashboard() {
                 {todos.map(todo => (
                   <li 
                     key={todo.id} 
-                    onClick={() => toggleTodo(todo.id, todo.isDone)}
-                    className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todo.isDone ? 'opacity-60' : ''}`}
+                    onClick={() => toggleTodo(todo.id, todo.is_done)}
+                    className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todo.is_done ? 'opacity-60' : ''}`}
                   >
-                    <div className={`mt-0.5 shrink-0 ${todo.isDone ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>
-                      {todo.isDone ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                    <div className={`mt-0.5 shrink-0 ${todo.is_done ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>
+                      {todo.is_done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
                     </div>
-                    <span className={`flex-1 font-medium text-sm transition-all ${todo.isDone ? 'text-slate-500 dark:text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
-                      {todo.text}
+                    <span className={`flex-1 font-medium text-sm transition-all ${todo.is_done ? 'text-slate-500 dark:text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                      {todo.desc}
                     </span>
                     <button 
                       onClick={(e) => { e.stopPropagation(); handleDeleteTodo(todo.id); }} 
@@ -237,7 +231,7 @@ export default function EventDashboard() {
                             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 dark:text-slate-400 text-sm font-medium">₱</span>
                             <input 
                               id={`price-${item.id}`}
-                              type="number" min="0" 
+                              type="number" min="0" step="0.01"
                               value={localMaterials[item.id]?.price ?? ''} 
                               onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], price: e.target.value}}))} 
                               onBlur={(e) => handleMaterialSubmit(item.id, 'price', e.target.value)}
@@ -273,7 +267,7 @@ export default function EventDashboard() {
             {/* Add New Material Form */}
             <form onSubmit={handleAddMaterial} className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-3 transition-colors">
               <input type="text" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} placeholder="New material name" className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
-              <input type="number" min="0" value={newMaterialPrice} onChange={(e) => setNewMaterialPrice(e.target.value)} placeholder="Price (₱)" className="w-full sm:w-32 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
+              <input type="number" min="0" step="0.01" value={newMaterialPrice} onChange={(e) => setNewMaterialPrice(e.target.value)} placeholder="Price (₱)" className="w-full sm:w-32 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
               <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-blue-600/20 whitespace-nowrap"><Plus size={16} /> Add Item</button>
             </form>
           </section>

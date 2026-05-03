@@ -4,8 +4,8 @@ import { useAuth } from '../app/contexts/AuthContext';
 
 export interface TodoItem {
   id: string;
-  text: string;
-  isDone: boolean;
+  desc: string;
+  is_done: boolean;
 }
 
 export function useTodos() {
@@ -17,9 +17,9 @@ export function useTodos() {
     if (!user?.classId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('todos').select('*').eq('class_id', user.classId).order('created_at', { ascending: true });
+      const { data, error } = await supabase.from('event_tasks').select('*').eq('class_id', user.classId).order('created_at', { ascending: true });
       if (error) throw error;
-      setTodos((data || []).map((t: any) => ({ id: t.id, text: t.text, isDone: t.is_done })));
+      setTodos((data || []).map((t: any) => ({ id: t.id, desc: t.desc, is_done: t.is_done })));
     } catch (error) {
       console.error('Error fetching todos:', error);
     } finally {
@@ -31,23 +31,23 @@ export function useTodos() {
 
   useEffect(() => {
     if (!user?.classId) return;
-    const channel = supabase.channel('todos-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'todos', filter: `class_id=eq.${user.classId}` }, fetchTodos).subscribe();
+    const channel = supabase.channel('event-tasks-rt')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_tasks', filter: `class_id=eq.${user.classId}` }, fetchTodos).subscribe();
     return () => { supabase.removeChannel(channel); };
   }, [user?.classId, fetchTodos]);
 
-  const addTodo = async (text: string) => {
-    const { error } = await supabase.from('todos').insert([{ class_id: user?.classId, text, is_done: false }]);
+  const addTodo = async (desc: string) => {
+    const { error } = await supabase.from('event_tasks').insert([{ class_id: user?.classId, desc, is_done: false }]);
     if (error) throw error;
   };
 
   const toggleTodo = async (id: string, currentStatus: boolean) => {
-    const { error } = await supabase.from('todos').update({ is_done: !currentStatus }).eq('id', id);
+    const { error } = await supabase.from('event_tasks').update({ is_done: !currentStatus }).eq('id', id);
     if (error) throw error;
   };
 
   const deleteTodo = async (id: string) => {
-    const { error } = await supabase.from('todos').delete().eq('id', id);
+    const { error } = await supabase.from('event_tasks').delete().eq('id', id);
     if (error) throw error;
   };
 
