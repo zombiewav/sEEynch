@@ -89,18 +89,22 @@ export function useTasks() {
   const addTask = async (newTaskData: Omit<Task, 'id'>) => {
     if (!user?.classId) throw new Error("User has no class assigned.");
 
+    // We strictly define the payload to exactly match your Postgres columns
+    // We omit 'materials' completely to prevent 400 Bad Request errors!
     const { error } = await supabase.from('tasks').insert([
       {
         class_id: user.classId,
         student_name: newTaskData.studentName,
         task_desc: newTaskData.taskDesc,
         status: newTaskData.status,
-        materials: newTaskData.materials,
         due_date: newTaskData.dueDate,
       },
     ]);
 
-    if (error) throw error;
+    if (error) {
+      console.error("Supabase error adding task:", error);
+      throw error;
+    }
   };
 
   const updateTaskStatus = async (taskId: string, status: Task['status']) => {
