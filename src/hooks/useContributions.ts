@@ -105,15 +105,60 @@ export function useContributions() {
   };
 
   const disseminateBudget = async (grandTotal: number) => {
-    if (!user?.classId || contributions.length === 0) return;
-    const studentCount = contributions.length;
+    if (!user?.classId) return;
+
+    // 1. Fetch all student profiles in the current class
+    const { data: profiles, error: profilesError } = await supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('class_id', user.classId)
+      .eq('role', 'student');
+
+    if (profilesError) throw profilesError;
+
+    const students = profiles || [];
+    if (students.length === 0) {
+      console.warn("No students found to disseminate budget to.");
+      return 0; // Return 0 if nobody is there
+    }
+
+    // 2. Calculate the amountPerStudent
+    const studentCount = students.length;
     const amountPerStudent = Math.ceil(grandTotal / studentCount);
-    const updates = contributions.map(c => ({
-      id: c.id, class_id: user.classId, name: c.name, amount_paid: c.amountPaid, required_amount: amountPerStudent,
-      status: (c.amountPaid >= amountPerStudent && amountPerStudent > 0) ? 'Paid' : (c.amountPaid > 0 ? 'Partially Paid' : (amountPerStudent === 0 && c.amountPaid === 0 ? 'Paid' : 'Unpaid'))
-    }));
+
+    // Fetch existing contributions to preserve their current payments and IDs
+    const { data: currentContribs } = await supabase
+      .from('contributions')
+      .select('id, name, amount_paid')
+      .eq('class_id', user.classId);
+      
+    const existingContribs = currentContribs || [];
+
+    // 3 & 4. Map over fetched students and upsert
+    const updates = students.map(student => {
+      const existing = existingContribs.find(c => c.name === student.full_name);
+      const amountPaid = existing ? Number(existing.amount_paid) : 0;
+      
+      // Determine new status based on any existing payments
+      let newStatus: PaymentStatus = 'Unpaid';
+      if (amountPaid >= amountPerStudent && amountPerStudent > 0) newStatus = 'Paid';
+      else if (amountPaid > 0) newStatus = 'Partially Paid';
+      else if (amountPerStudent === 0 && amountPaid === 0) newStatus = 'Paid';
+
+      return {
+        ...(existing ? { id: existing.id } : {}), // Include ID to properly upsert if it exists
+        class_id: user.classId,
+        name: student.full_name,
+        amount_paid: amountPaid,
+        required_amount: amountPerStudent,
+        status: newStatus
+      };
+    });
+
     const { error } = await supabase.from('contributions').upsert(updates);
     if (error) throw error;
+
+    return amountPerStudent;
   };
   
   const markAllPaid = async () => {

@@ -106,9 +106,10 @@ export default function EventDashboard() {
     if (window.confirm("Are you sure? This will lock in the budget and update the required Ambagan for all students.")) {
       setIsDisseminating(true);
       try {
-        await disseminateBudget(grandTotal);
-        const amountPerStudent = contributions.length > 0 ? Math.ceil(grandTotal / contributions.length) : 0;
-        await addActivity('payment', `disseminated a budget of ₱${amountPerStudent} per student.`, user?.fullName || 'System');
+        const amountPerStudent = await disseminateBudget(grandTotal);
+        if (amountPerStudent !== undefined) {
+          await addActivity('payment', `disseminated a budget of ₱${amountPerStudent} per student.`, user?.fullName || 'System');
+        }
       } catch (error) {
         console.error("Failed to disseminate budget:", error);
       } finally {

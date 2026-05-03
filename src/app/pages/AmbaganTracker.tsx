@@ -3,11 +3,13 @@ import { CheckCircle2, Info } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useContributions } from "../../hooks/useContributions";
 import { useActivityLog } from "../../hooks/useActivityLog";
+import { useMembers } from "../../hooks/useMembers";
 
 export default function AmbaganTracker() {
   const { user } = useAuth();
   const { contributions, updatePayment, markAllPaid } = useContributions();
   const { addActivity } = useActivityLog();
+  const { members } = useMembers();
   
   const [localAmounts, setLocalAmounts] = useState<Record<string, string>>({});
 
@@ -44,7 +46,9 @@ export default function AmbaganTracker() {
 
   const expectedExpenses = getExpectedExpenses();
   const actualExpenses = getActualExpenses();
-  const autoAmbagan = contributions.length > 0 ? Math.ceil(expectedExpenses / contributions.length) : 0;
+  
+  const studentCount = members.filter(m => m.role === 'Student').length || contributions.length;
+  const autoAmbagan = studentCount > 0 ? Math.ceil(expectedExpenses / studentCount) : 0;
 
   const handleMarkAllCleared = async () => {
     if(window.confirm("Are you sure you want to mark everyone as fully paid?")) {
@@ -93,7 +97,7 @@ export default function AmbaganTracker() {
         <Info className="text-blue-500 shrink-0 mt-0.5" size={20} />
         <p className="text-sm text-blue-800 dark:text-blue-200">
           The required target goal is <strong>finalized and disseminated</strong> by officers from the Event Dashboard. 
-          (Current Estimated Cost: <strong>₱{expectedExpenses.toLocaleString()}</strong> ÷ {contributions.length} members = <strong>₱{autoAmbagan.toLocaleString()}</strong> per student).
+          (Current Estimated Cost: <strong>₱{expectedExpenses.toLocaleString()}</strong> ÷ {studentCount} members = <strong>₱{autoAmbagan.toLocaleString()}</strong> per student).
         </p>
       </div>
 
