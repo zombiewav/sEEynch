@@ -16,33 +16,37 @@ export default function Members() {
 
   // 1. Change inviteCode to a state variable so React can update it
   const [inviteCode, setInviteCode] = useState("Loading...");
+  const [className, setClassName] = useState("Loading..."); // <-- Add this!
 
-  // 2. Fetch the real code from Supabase as soon as the component loads
+  // 2. Fetch the real code and class name from Supabase as soon as the component loads
   useEffect(() => {
-    const fetchInviteCode = async () => {
+    const fetchClassData = async () => {
       // If the user doesn't have a class yet, do nothing
       if (!user?.classId) return; 
 
       try {
         const { data, error } = await supabase
           .from('classes')
-          .select('invite_code')
+          .select('invite_code, course_name, year_section') // <-- Grab the names too!
           .eq('id', user.classId)
           .single();
 
         if (error) throw error;
         
-        // Update the screen with the real code!
+        // Update the screen with the real code and class name!
         if (data) {
           setInviteCode(data.invite_code);
+          // Combine the course name and section (e.g. "TEST CLASS 1b")
+          setClassName(`${data.course_name} ${data.year_section}`); 
         }
       } catch (error) {
-        console.error("Error fetching invite code:", error);
+        console.error("Error fetching class data:", error);
         setInviteCode("ERROR-FETCHING-CODE");
+        setClassName("Unknown Class");
       }
     };
 
-    fetchInviteCode();
+    fetchClassData();
   }, [user?.classId]);
 
   const handleCopyCode = () => {
@@ -194,7 +198,7 @@ export default function Members() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl md:text-4xl font-extrabold text-gray-900 dark:text-white tracking-tight">
-            Classmates of BSEE 1-B
+            Classmates of {className}
           </h1>
           <p className="text-gray-500 dark:text-slate-400 mt-2 font-medium">
             View and manage all members.
