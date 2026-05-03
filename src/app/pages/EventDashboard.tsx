@@ -4,12 +4,16 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTodos } from "../../hooks/useTodos";
 import { useMaterials } from "../../hooks/useMaterials";
 import { useActivityLog } from "../../hooks/useActivityLog";
+import { useContributions } from "../../hooks/useContributions";
+import { useReceipts } from "../../hooks/useReceipts";
 
 export default function EventDashboard() {
   const { user } = useAuth();
   const { todos, addTodo, toggleTodo, deleteTodo } = useTodos();
   const { materials, addMaterial, updateMaterial, deleteMaterial } = useMaterials();
   const { addActivity } = useActivityLog();
+  const { contributions, disseminateBudget } = useContributions();
+  const { receipts } = useReceipts();
   
   const [localMaterials, setLocalMaterials] = useState<Record<string, { price: string, quantity: string }>>({});
 
@@ -46,6 +50,7 @@ export default function EventDashboard() {
   const [newTodo, setNewTodo] = useState("");
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialPrice, setNewMaterialPrice] = useState("");
+  const [isDisseminating, setIsDisseminating] = useState(false);
 
   const handleDeleteTodo = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this task?")) {
@@ -97,25 +102,28 @@ export default function EventDashboard() {
     }
   };
 
+  const handleDisseminate = async () => {
+    if (window.confirm("Are you sure? This will lock in the budget and update the required Ambagan for all students.")) {
+      setIsDisseminating(true);
+      try {
+        await disseminateBudget(grandTotal);
+        const amountPerStudent = contributions.length > 0 ? Math.ceil(grandTotal / contributions.length) : 0;
+        await addActivity('payment', `disseminated a budget of ₱${amountPerStudent} per student.`, user?.fullName || 'System');
+      } catch (error) {
+        console.error("Failed to disseminate budget:", error);
+      } finally {
+        setIsDisseminating(false);
+      }
+    }
+  };
+
   // Derived state computations - Fixed to use is_completed
   const completedTodos = todos.filter(t => t.is_completed).length;
   const todoProgress = todos.length > 0 ? Math.round((completedTodos / todos.length) * 100) : 0;
   const grandTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
   
-  const getCollectedFunds = () => {
-    const defaultContributions: any[] = [];
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "null") || defaultContributions;
-    return contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
-  };
-
-  const getActualExpenses = () => {
-    const defaultReceipts: any[] = [];
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "null") || defaultReceipts;
-    return receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
-  };
-
-  const collectedFunds = getCollectedFunds();
-  const actualExpenses = getActualExpenses();
+  const collectedFunds = contributions.reduce((sum, c) => sum + c.amountPaid, 0);
+  const actualExpenses = receipts.reduce((sum, r) => sum + r.amount, 0);
   const availableBalance = collectedFunds - actualExpenses;
 
   return (
@@ -127,7 +135,7 @@ export default function EventDashboard() {
           Event Dashboard
         </h1>
         <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">
-          Centralized Event Planner. Manage your step-by-step tasks and auto-computing materials list.
+          Manage your event's to-do list and budget materials.
         </p>
       </div>
 
@@ -158,7 +166,7 @@ export default function EventDashboard() {
               <ul className="space-y-2">
                 {todos.map(todo => (
                   <li 
-                    key={todo.id} 
+                    key={todo.id}
                     onClick={() => toggleTodo(todo.id, todo.is_completed)}
                     className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todo.is_completed ? 'opacity-60' : ''}`}
                   >
@@ -196,24 +204,26 @@ export default function EventDashboard() {
                 <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400">Materials & Cost Calculator</h2>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Updates automatically: Price × Quantity</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <div className="bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors hidden xl:block">
                   <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">Available Balance</p>
                   <p className={`text-xl font-extrabold transition-colors ${availableBalance < grandTotal ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>₱{Math.max(0, availableBalance).toLocaleString()}</p>
                 </div>
-                <div className="bg-orange-50 dark:bg-orange-950/30 px-4 py-2 rounded-xl border border-orange-100 dark:border-orange-900/50 transition-colors">
+                <div className="bg-orange-50 dark:bg-orange-950/30 px-4 py-2 rounded-xl border border-orange-100 dark:border-orange-900/50 transition-colors text-right sm:text-left">
                   <p className="text-xs font-bold text-orange-600/80 dark:text-orange-400/80 uppercase tracking-wider mb-0.5">Estimated Total</p>
                   <p className="text-2xl font-extrabold text-orange-600 dark:text-orange-400 transition-colors">₱{grandTotal.toLocaleString()}</p>
                 </div>
+                <button onClick={handleDisseminate} disabled={isDisseminating || materials.length === 0} className="bg-orange-600 hover:bg-orange-700 text-white font-bold px-4 py-2.5 rounded-xl transition-colors flex items-center justify-center gap-2 text-sm shadow-sm shadow-orange-600/20 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap">
+                  {isDisseminating ? 'Disseminating...' : 'Finalize & Disseminate'}
+                </button>
               </div>
             </div>
-            
             <div className="overflow-x-auto flex-1">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-sm border-b border-slate-200 dark:border-slate-700 transition-colors">
-                    <th className="px-6 py-4 font-semibold">Item Name</th>
-                    <th className="px-6 py-4 font-semibold w-36">Price (₱)</th>
+                    <th className="px-6 py-4 font-semibold">Material Item</th>
+                    <th className="px-6 py-4 font-semibold">Price per item</th>
                     <th className="px-6 py-4 font-semibold w-24">Qty</th>
                     <th className="px-6 py-4 font-semibold text-right">Total Cost</th>
                     <th className="px-6 py-4 font-semibold text-right">Actions</th>

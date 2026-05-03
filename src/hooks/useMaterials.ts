@@ -2,9 +2,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../app/contexts/AuthContext';
 
+export interface Material {
+  id: string;
+  name: string;
+  price: number;
+  quantity: number;
+  item_name: string;
+  unit_price: number;
+}
+
 export function useMaterials() {
   const { user } = useAuth();
-  const [materials, setMaterials] = useState<any[]>([]);
+  const [materials, setMaterials] = useState<Material[]>([]);
 
   const fetchMaterials = useCallback(async () => {
     if (!user?.classId) return;

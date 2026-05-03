@@ -2,9 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../app/contexts/AuthContext';
 
+export interface Todo {
+  id: string;
+  class_id: string;
+  created_at: string;
+  task_description: string;
+  is_completed: boolean;
+}
+
 export function useTodos() {
   const { user } = useAuth();
-  const [todos, setTodos] = useState<any[]>([]);
+  const [todos, setTodos] = useState<Todo[]>([]);
 
   const fetchTodos = useCallback(async () => {
     if (!user?.classId) return;

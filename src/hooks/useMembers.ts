@@ -15,9 +15,9 @@ interface DbProfile {
     id: string;
     class_id: string;
     full_name: string;
-    student_id: string;
-    role: 'student' | 'officer';
-    officer_position?: string;
+    student_id: string | null;
+    role: string;
+    officer_position: string | null;
 }
 
 export function useMembers() {
@@ -40,12 +40,12 @@ export function useMembers() {
 
       if (error) throw error;
 
-      const formattedMembers: Member[] = (data || []).map((profile: any) => ({
+      const formattedMembers: Member[] = ((data as DbProfile[]) || []).map((profile) => ({
         id: profile.id,
         name: profile.full_name,
         studentId: profile.student_id || '',
-        role: profile.role === 'officer' ? 'Officer' : 'Student',
-        position: profile.officer_position,
+        role: profile.role.toLowerCase() === 'officer' ? 'Officer' : 'Student',
+        position: profile.officer_position || undefined, // Convert Supabase 'null' to TypeScript 'undefined'
         avatar: (profile.full_name || "U").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2),
       }));
       setMembers(formattedMembers);

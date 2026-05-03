@@ -6,11 +6,10 @@ import { useActivityLog } from "../../hooks/useActivityLog";
 
 export default function AmbaganTracker() {
   const { user } = useAuth();
-  const { contributions, updatePayment, syncAllRequiredAmounts, markAllPaid } = useContributions();
+  const { contributions, updatePayment, markAllPaid } = useContributions();
   const { addActivity } = useActivityLog();
   
   const [localAmounts, setLocalAmounts] = useState<Record<string, string>>({});
-  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     setLocalAmounts(prev => {
@@ -46,16 +45,6 @@ export default function AmbaganTracker() {
   const expectedExpenses = getExpectedExpenses();
   const actualExpenses = getActualExpenses();
   const autoAmbagan = contributions.length > 0 ? Math.ceil(expectedExpenses / contributions.length) : 0;
-
-  useEffect(() => {
-    const currentRequired = contributions[0]?.requiredAmount;
-    if (currentRequired !== undefined && currentRequired !== autoAmbagan && autoAmbagan > 0 && !isSyncing) {
-        setIsSyncing(true);
-        syncAllRequiredAmounts(autoAmbagan).then(() => {
-           addActivity('payment', `updated the required ambagan to ₱${autoAmbagan} per student.`, user?.fullName || 'System');
-        }).finally(() => setIsSyncing(false));
-    }
-  }, [autoAmbagan, contributions, isSyncing, syncAllRequiredAmounts, user?.fullName]);
 
   const handleMarkAllCleared = async () => {
     if(window.confirm("Are you sure you want to mark everyone as fully paid?")) {
@@ -103,7 +92,7 @@ export default function AmbaganTracker() {
       <div className="bg-blue-50 dark:bg-blue-900/30 p-4 rounded-xl border border-blue-100 dark:border-blue-800/50 flex items-start gap-3 transition-colors">
         <Info className="text-blue-500 shrink-0 mt-0.5" size={20} />
         <p className="text-sm text-blue-800 dark:text-blue-200">
-          The required target goal is being <strong>automatically calculated</strong> based on the materials and costs you set in the Event Dashboard. 
+          The required target goal is <strong>finalized and disseminated</strong> by officers from the Event Dashboard. 
           (Current Estimated Cost: <strong>₱{expectedExpenses.toLocaleString()}</strong> ÷ {contributions.length} members = <strong>₱{autoAmbagan.toLocaleString()}</strong> per student).
         </p>
       </div>

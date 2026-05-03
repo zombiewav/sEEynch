@@ -104,11 +104,13 @@ export function useContributions() {
     if (error) throw error;
   };
 
-  const syncAllRequiredAmounts = async (newRequiredAmount: number) => {
+  const disseminateBudget = async (grandTotal: number) => {
     if (!user?.classId || contributions.length === 0) return;
+    const studentCount = contributions.length;
+    const amountPerStudent = Math.ceil(grandTotal / studentCount);
     const updates = contributions.map(c => ({
-      id: c.id, class_id: user.classId, name: c.name, amount_paid: c.amountPaid, required_amount: newRequiredAmount,
-      status: (c.amountPaid >= newRequiredAmount && newRequiredAmount > 0) ? 'Paid' : (c.amountPaid > 0 ? 'Partially Paid' : (newRequiredAmount === 0 && c.amountPaid === 0 ? 'Paid' : 'Unpaid'))
+      id: c.id, class_id: user.classId, name: c.name, amount_paid: c.amountPaid, required_amount: amountPerStudent,
+      status: (c.amountPaid >= amountPerStudent && amountPerStudent > 0) ? 'Paid' : (c.amountPaid > 0 ? 'Partially Paid' : (amountPerStudent === 0 && c.amountPaid === 0 ? 'Paid' : 'Unpaid'))
     }));
     const { error } = await supabase.from('contributions').upsert(updates);
     if (error) throw error;
@@ -126,5 +128,5 @@ export function useContributions() {
     if (error) throw error;
   };
 
-  return { contributions, loading, updatePayment, syncAllRequiredAmounts, markAllPaid, markAsPending };
+  return { contributions, loading, updatePayment, disseminateBudget, markAllPaid, markAsPending };
 }
