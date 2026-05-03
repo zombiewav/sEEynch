@@ -21,7 +21,7 @@ export function useActivityLog() {
     try {
       const { data, error } = await supabase.from('activity_logs').select('*').eq('class_id', user.classId).order('timestamp', { ascending: false }).limit(50);
       if (error) throw error;
-      setActivities(data.map((log: any) => ({ id: log.id, type: log.type, message: log.message, actor: log.actor, timestamp: Number(log.timestamp) })));
+      setActivities((data || []).map((log: any) => ({ id: log.id, type: log.type, message: log.message, actor: log.actor, timestamp: Number(log.timestamp) })));
     } catch (error) {
       console.error('Error fetching activity logs:', error);
     } finally {

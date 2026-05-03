@@ -20,7 +20,7 @@ export function useMaterials() {
     try {
       const { data, error } = await supabase.from('materials').select('*').eq('class_id', user.classId).order('created_at', { ascending: true });
       if (error) throw error;
-      setMaterials(data.map((m: any) => ({ id: m.id, name: m.name, price: Number(m.price), quantity: Number(m.quantity) })));
+      setMaterials((data || []).map((m: any) => ({ id: m.id, name: m.name, price: Number(m.price), quantity: Number(m.quantity) })));
     } catch (error) {
       console.error('Error fetching materials:', error);
     } finally {

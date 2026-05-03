@@ -26,7 +26,7 @@ export function useReceipts() {
     try {
       const { data, error } = await supabase.from('receipts').select('*').eq('class_id', user.classId).order('date', { ascending: false });
       if (error) throw error;
-      setReceipts(data.map((r: any) => ({
+      setReceipts((data || []).map((r: any) => ({
         id: r.id, description: r.description, amount: Number(r.amount), category: r.category, date: r.date, uploaderName: r.uploader_name
       })));
     } catch (error) {

@@ -40,13 +40,13 @@ export function useMembers() {
 
       if (error) throw error;
 
-      const formattedMembers: Member[] = data.map((profile: DbProfile) => ({
+      const formattedMembers: Member[] = (data || []).map((profile: any) => ({
         id: profile.id,
         name: profile.full_name,
         studentId: profile.student_id || '',
         role: profile.role === 'officer' ? 'Officer' : 'Student',
         position: profile.officer_position,
-        avatar: profile.full_name.split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2),
+        avatar: (profile.full_name || "U").split(" ").map((w: string) => w[0]).join("").toUpperCase().slice(0, 2),
       }));
       setMembers(formattedMembers);
     } catch (error) {

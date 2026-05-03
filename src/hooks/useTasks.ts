@@ -45,7 +45,7 @@ export function useTasks() {
 
       if (error) throw error;
 
-      const formattedTasks: Task[] = data.map((task: DbTask) => ({
+      const formattedTasks: Task[] = (data || []).map((task: DbTask) => ({
         id: task.id,
         studentName: task.student_name,
         taskDesc: task.task_desc,

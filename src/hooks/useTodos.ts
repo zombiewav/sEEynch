@@ -19,7 +19,7 @@ export function useTodos() {
     try {
       const { data, error } = await supabase.from('todos').select('*').eq('class_id', user.classId).order('created_at', { ascending: true });
       if (error) throw error;
-      setTodos(data.map((t: any) => ({ id: t.id, text: t.text, isDone: t.is_done })));
+      setTodos((data || []).map((t: any) => ({ id: t.id, text: t.text, isDone: t.is_done })));
     } catch (error) {
       console.error('Error fetching todos:', error);
     } finally {
