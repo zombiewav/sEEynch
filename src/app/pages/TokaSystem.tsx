@@ -2,12 +2,14 @@ import React, { useState, useEffect } from "react";
 import { ChevronDown, AlertCircle, Plus, Trash2 } from "lucide-react";
 import { useAuth } from "../contexts/AuthContext";
 import { useTasks, Task } from "../../hooks/useTasks";
- import { useActivityLog } from "../../hooks/useActivityLog";
+import { useActivityLog } from "../../hooks/useActivityLog";
+import { useMembers } from "../../hooks/useMembers";
 
 export default function TokaSystem() {
   const { user } = useAuth();
   const { tasks, addTask, updateTaskStatus, deleteTask } = useTasks();
   const { addActivity } = useActivityLog();
+  const { members } = useMembers(); // <-- ADD THIS LINE
   
   const [newTaskStudent, setNewTaskStudent] = useState("");
   const [newTaskDesc, setNewTaskDesc] = useState("");
@@ -119,9 +121,29 @@ export default function TokaSystem() {
         
         {/* Add New Task Form */}
         <form onSubmit={handleAddTask} className="p-4 sm:p-6 border-b border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-3 transition-colors">
-          <input type="text" value={newTaskStudent} onChange={(e) => setNewTaskStudent(e.target.value)} placeholder="Assign to (Student Name)" className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
-          <input type="text" value={newTaskDesc} onChange={(e) => setNewTaskDesc(e.target.value)} placeholder="Task Description" className="flex-[2] px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
-          <input type="date" value={newTaskDate} onChange={(e) => setNewTaskDate(e.target.value)} className="w-full sm:w-auto px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
+          
+          {/* THE NEW DROPDOWN MENU */}
+          <div className="relative flex-1">
+            <select 
+              value={newTaskStudent} 
+              onChange={(e) => setNewTaskStudent(e.target.value)} 
+              className="appearance-none w-full px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100 cursor-pointer"
+              required
+            >
+              <option value="" disabled>Assign to...</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.name}>
+                  {member.name}
+                </option>
+              ))}
+            </select>
+            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-slate-500 dark:text-slate-400">
+              <ChevronDown size={16} />
+            </div>
+          </div>
+
+          <input type="text" value={newTaskDesc} onChange={(e) => setNewTaskDesc(e.target.value)} placeholder="Task Description" className="flex-[2] px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" required />
+          <input type="date" value={newTaskDate} onChange={(e) => setNewTaskDate(e.target.value)} className="w-full sm:w-auto px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" required />
           <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-blue-600/20 whitespace-nowrap"><Plus size={16} /> Assign Task</button>
         </form>
         
