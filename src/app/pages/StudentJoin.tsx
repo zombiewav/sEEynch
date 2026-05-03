@@ -4,24 +4,59 @@ import { Hash, ArrowRight, GraduationCap, CheckCircle2 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../../lib/supabase";
 
 export function StudentJoin() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth(); // Grab refreshProfile!
   const state = location.state as { name?: string } | null;
   const studentName = user?.fullName || state?.name || "Student";
   
   const [inviteCode, setInviteCode] = useState("");
   const [isJoined, setIsJoined] = useState(false);
+  const [errorMsg, setErrorMsg] = useState(""); // Add this to show errors
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (inviteCode.trim().length > 0) {
+    setErrorMsg(""); // Clear old errors
+
+    if (!inviteCode.trim() || !user) return;
+
+    try {
+      // 1. Search the database for the class using the invite code
+      const { data: classData, error: searchError } = await supabase
+        .from('classes')
+        .select('id, course_name')
+        .eq('invite_code', inviteCode.trim().toUpperCase())
+        .single(); // .single() ensures we only get one exact match
+
+      if (searchError || !classData) {
+        throw new Error("Invalid invite code. Please check and try again.");
+      }
+
+      // 2. Update the student's profile to link them to this class
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ class_id: classData.id })
+        .eq('id', user.id);
+
+      if (updateError) throw updateError;
+
+      // 3. Refresh the user context so your ProtectedRoutes know they have a class now!
+      if (refreshProfile) {
+        await refreshProfile();
+      }
+
+      // 4. Trigger the success UI and navigate
       setIsJoined(true);
       setTimeout(() => {
         navigate("/student", { state: { name: studentName } });
-      }, 2000); // Wait 2 seconds for the success animation before navigating
+      }, 2000);
+
+    } catch (error: any) {
+      console.error("Error joining class:", error.message);
+      setErrorMsg(error.message);
     }
   };
 
@@ -79,6 +114,9 @@ export function StudentJoin() {
                       required
                     />
                   </div>
+                  {errorMsg && (
+                    <p className="text-xs text-red-500 font-medium mt-2">{errorMsg}</p>
+                  )}
                 </div>
 
                 {/* Submit Button */}
