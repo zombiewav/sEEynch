@@ -2,54 +2,50 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../app/contexts/AuthContext';
 
-export interface TodoItem {
-  id: string;
-  desc: string;
-  is_done: boolean;
-}
-
 export function useTodos() {
   const { user } = useAuth();
-  const [todos, setTodos] = useState<TodoItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [todos, setTodos] = useState<any[]>([]);
 
   const fetchTodos = useCallback(async () => {
     if (!user?.classId) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.from('event_tasks').select('*').eq('class_id', user.classId).order('created_at', { ascending: true });
-      if (error) throw error;
-      setTodos((data || []).map((t: any) => ({ id: t.id, desc: t.desc, is_done: t.is_done })));
-    } catch (error) {
-      console.error('Error fetching todos:', error);
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from('todos') // Matches your visualizer
+      .select('*')
+      .eq('class_id', user.classId)
+      .order('created_at', { ascending: true });
+
+    if (!error) setTodos(data || []);
   }, [user?.classId]);
 
   useEffect(() => { fetchTodos(); }, [fetchTodos]);
 
-  useEffect(() => {
+  const addTodo = async (task_description: string) => {
     if (!user?.classId) return;
-    const channel = supabase.channel('event-tasks-rt')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'event_tasks', filter: `class_id=eq.${user.classId}` }, fetchTodos).subscribe();
-    return () => { supabase.removeChannel(channel); };
-  }, [user?.classId, fetchTodos]);
-
-  const addTodo = async (desc: string) => {
-    const { error } = await supabase.from('event_tasks').insert([{ class_id: user?.classId, desc, is_done: false }]);
+    const { error } = await supabase
+      .from('todos')
+      .insert([{ 
+        class_id: user.classId, 
+        task_description, // Matches task_description in visualizer
+        is_completed: false 
+      }]);
+    
     if (error) throw error;
+    fetchTodos();
   };
 
-  const toggleTodo = async (id: string, currentStatus: boolean) => {
-    const { error } = await supabase.from('event_tasks').update({ is_done: !currentStatus }).eq('id', id);
+  const toggleTodo = async (id: string, is_completed: boolean) => {
+    const { error } = await supabase
+      .from('todos')
+      .update({ is_completed: !is_completed })
+      .eq('id', id);
     if (error) throw error;
+    fetchTodos();
   };
 
   const deleteTodo = async (id: string) => {
-    const { error } = await supabase.from('event_tasks').delete().eq('id', id);
-    if (error) throw error;
+    await supabase.from('todos').delete().eq('id', id);
+    fetchTodos();
   };
 
-  return { todos, loading, addTodo, toggleTodo, deleteTodo };
+  return { todos, addTodo, toggleTodo, deleteTodo };
 }

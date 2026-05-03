@@ -38,7 +38,6 @@ export default function EventDashboard() {
       return changed ? next : prev;
     });
 
-    // Mirror expected expenses for the Ambagan Tracker & Transparency Board
     localStorage.setItem('sEEync_event_materials', JSON.stringify(materials));
     const gTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
     localStorage.setItem('sEEync_expected_expenses', gTotal.toString());
@@ -48,46 +47,25 @@ export default function EventDashboard() {
   const [newMaterialName, setNewMaterialName] = useState("");
   const [newMaterialPrice, setNewMaterialPrice] = useState("");
 
-  const handleDeleteTodo = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this task?")) {
-      await deleteTodo(id);
-    }
-  };
-
-  const handleDeleteMaterial = async (id: string) => {
-    if (window.confirm("Are you sure you want to delete this material?")) {
-      await deleteMaterial(id);
-    }
-  };
-
   const handleAddTodo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTodo.trim()) return;
-    
     try {
-      await addTodo(newTodo); // Sending desc to useTodos hook
-      const todoText = newTodo;
+      await addTodo(newTodo);
       setNewTodo("");
-      await addActivity('event', `added a new to-do: "${todoText}"`, user?.fullName || 'Officer');
-    } catch (error) {
-      console.error("Failed to add task:", error);
-    }
+      await addActivity('event', `added a new to-do: "${newTodo}"`, user?.fullName || 'Officer');
+    } catch (error) { console.error(error); }
   };
 
   const handleAddMaterial = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newMaterialName.trim()) return;
-    const price = parseFloat(newMaterialPrice) || 0;
-    
     try {
-      await addMaterial(newMaterialName, price);
-      const matName = newMaterialName;
+      await addMaterial(newMaterialName, parseFloat(newMaterialPrice) || 0);
       setNewMaterialName("");
       setNewMaterialPrice("");
-      await addActivity('event', `added a new material: "${matName}"`, user?.fullName || 'Officer');
-    } catch (error) {
-      console.error("Failed to add material:", error);
-    }
+      await addActivity('event', `added a new material: "${newMaterialName}"`, user?.fullName || 'Officer');
+    } catch (error) { console.error(error); }
   };
 
   const handleMaterialSubmit = async (id: string, field: 'price' | 'quantity', value: string) => {
@@ -98,57 +76,29 @@ export default function EventDashboard() {
     }
   };
 
-  // Derived state computations
-  const completedTodos = todos.filter(t => t.is_done).length;
+  const completedTodos = todos.filter(t => t.is_completed).length;
   const todoProgress = todos.length > 0 ? Math.round((completedTodos / todos.length) * 100) : 0;
   const grandTotal = materials.reduce((sum, m) => sum + (m.price * m.quantity), 0);
-  
-  const getCollectedFunds = () => {
-    const contributions = JSON.parse(localStorage.getItem('sEEync_contributions') || "[]");
-    return contributions.reduce((sum: number, c: any) => sum + (c.amountPaid || 0), 0);
-  };
-
-  const getActualExpenses = () => {
-    const receiptsData = JSON.parse(localStorage.getItem('sEEync_receipts') || "[]");
-    return receiptsData.reduce((sum: number, r: any) => sum + (r.amount || 0), 0);
-  };
-
-  const collectedFunds = getCollectedFunds();
-  const actualExpenses = getActualExpenses();
-  const availableBalance = collectedFunds - actualExpenses;
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-      
-      {/* Header */}
       <div>
-        <h1 className="text-3xl md:text-4xl font-extrabold text-blue-900 dark:text-blue-400 tracking-tight transition-colors">
-          Event Dashboard
-        </h1>
-        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">
-          Centralized Event Planner. Manage your step-by-step tasks and auto-computing materials list.
-        </p>
+        <h1 className="text-3xl md:text-4xl font-extrabold text-blue-900 dark:text-blue-400 tracking-tight">Event Dashboard</h1>
+        <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium">Manage your step-by-step tasks and auto-computing materials list.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-8">
-        
-        {/* Left Column: To-Do List */}
         <div className="lg:col-span-1 space-y-6">
-          <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-blue-50/50 dark:bg-blue-950/20 transition-colors">
+          <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-700 bg-blue-50/50 dark:bg-blue-950/20">
               <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400">Step-by-Step To-Do</h2>
-              
-              {/* Progress Bar */}
               <div className="mt-4">
                 <div className="flex justify-between items-end mb-2">
                   <p className="text-xs font-bold text-blue-600/80 dark:text-blue-400/80 uppercase tracking-wider">Planning Progress</p>
                   <p className="text-sm font-extrabold text-blue-600 dark:text-blue-400">{todoProgress}%</p>
                 </div>
-                <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-2 overflow-hidden transition-colors">
-                  <div 
-                    className="bg-blue-500 dark:bg-blue-500 h-full rounded-full transition-all duration-500 ease-out"
-                    style={{ width: `${todoProgress}%` }}
-                  ></div>
+                <div className="w-full bg-blue-100 dark:bg-blue-900/30 rounded-full h-2 overflow-hidden">
+                  <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${todoProgress}%` }}></div>
                 </div>
               </div>
             </div>
@@ -156,119 +106,67 @@ export default function EventDashboard() {
             <div className="p-4">
               <ul className="space-y-2">
                 {todos.map(todo => (
-                  <li 
-                    key={todo.id} 
-                    onClick={() => toggleTodo(todo.id, todo.is_done)}
-                    className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer transition-colors border border-transparent hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todo.is_done ? 'opacity-60' : ''}`}
-                  >
-                    <div className={`mt-0.5 shrink-0 ${todo.is_done ? 'text-emerald-500 dark:text-emerald-400' : 'text-slate-300 dark:text-slate-600'}`}>
-                      {todo.is_done ? <CheckCircle2 size={20} /> : <Circle size={20} />}
+                  <li key={todo.id} onClick={() => toggleTodo(todo.id, todo.is_completed)} className={`flex items-start gap-3 p-3 rounded-xl cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 ${todo.is_completed ? 'opacity-60' : ''}`}>
+                    <div className={`mt-0.5 shrink-0 ${todo.is_completed ? 'text-emerald-500' : 'text-slate-300'}`}>
+                      {todo.is_completed ? <CheckCircle2 size={20} /> : <Circle size={20} />}
                     </div>
-                    <span className={`flex-1 font-medium text-sm transition-all ${todo.is_done ? 'text-slate-500 dark:text-slate-400 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
-                      {todo.desc}
+                    <span className={`flex-1 font-medium text-sm ${todo.is_completed ? 'text-slate-500 line-through' : 'text-slate-700 dark:text-slate-200'}`}>
+                      {todo.task_description}
                     </span>
-                    <button 
-                      onClick={(e) => { e.stopPropagation(); handleDeleteTodo(todo.id); }} 
-                      className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0" 
-                      title="Delete Task"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <button onClick={(e) => { e.stopPropagation(); deleteTodo(todo.id); }} className="text-slate-400 hover:text-red-500 p-1"><Trash2 size={16} /></button>
                   </li>
                 ))}
               </ul>
-              
-              {/* Add New To-Do Form */}
               <form onSubmit={handleAddTodo} className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700 flex gap-2">
-                <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Add new task..." className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
-                <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl transition-colors shadow-sm shadow-blue-600/20"><Plus size={20} /></button>
+                <input type="text" value={newTodo} onChange={(e) => setNewTodo(e.target.value)} placeholder="Add new task..." className="flex-1 px-3 py-2.5 bg-slate-50 dark:bg-slate-900 border border-slate-200 rounded-xl text-sm" />
+                <button type="submit" className="bg-blue-600 text-white px-4 py-2.5 rounded-xl"><Plus size={20} /></button>
               </form>
             </div>
           </section>
         </div>
 
-        {/* Right Column: Materials Calculator */}
         <div className="lg:col-span-2 space-y-6">
-          <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm overflow-hidden transition-colors flex flex-col h-full">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-colors">
-              <div>
-                <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400">Materials & Cost Calculator</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">Updates automatically: Price × Quantity</p>
-              </div>
-              <div className="flex gap-3">
-                <div className="bg-slate-50 dark:bg-slate-900 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 transition-colors hidden xl:block">
-                  <p className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-0.5">Available Balance</p>
-                  <p className={`text-xl font-extrabold transition-colors ${availableBalance < grandTotal ? 'text-red-500' : 'text-emerald-600 dark:text-emerald-400'}`}>₱{Math.max(0, availableBalance).toLocaleString()}</p>
-                </div>
-                <div className="bg-orange-50 dark:bg-orange-950/30 px-4 py-2 rounded-xl border border-orange-100 dark:border-orange-900/50 transition-colors">
-                  <p className="text-xs font-bold text-orange-600/80 dark:text-orange-400/80 uppercase tracking-wider mb-0.5">Estimated Total</p>
-                  <p className="text-2xl font-extrabold text-orange-600 dark:text-orange-400 transition-colors">₱{grandTotal.toLocaleString()}</p>
-                </div>
+          <section className="bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-full">
+            <div className="p-6 border-b flex justify-between items-center gap-4">
+              <h2 className="text-xl font-bold text-blue-900 dark:text-blue-400">Materials & Cost Calculator</h2>
+              <div className="bg-orange-50 dark:bg-orange-950/30 px-4 py-2 rounded-xl border border-orange-100">
+                <p className="text-2xl font-extrabold text-orange-600">₱{grandTotal.toLocaleString()}</p>
               </div>
             </div>
-            
             <div className="overflow-x-auto flex-1">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-slate-50 dark:bg-slate-900 text-slate-500 dark:text-slate-400 text-sm border-b border-slate-200 dark:border-slate-700 transition-colors">
-                    <th className="px-6 py-4 font-semibold">Item Name</th>
-                    <th className="px-6 py-4 font-semibold w-36">Price (₱)</th>
-                    <th className="px-6 py-4 font-semibold w-24">Qty</th>
-                    <th className="px-6 py-4 font-semibold text-right">Total Cost</th>
-                    <th className="px-6 py-4 font-semibold text-right">Actions</th>
+              <table className="w-full text-left">
+                <thead className="bg-slate-50 dark:bg-slate-900 text-slate-500 text-sm border-b">
+                  <tr>
+                    <th className="px-6 py-4">Item Name</th>
+                    <th className="px-6 py-4 w-36">Price (₱)</th>
+                    <th className="px-6 py-4 w-24">Qty</th>
+                    <th className="px-6 py-4 text-right">Total Cost</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-                  {materials.map((item) => {
-                    const totalCost = item.price * item.quantity;
-                    return (
-                      <tr key={item.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-700/30 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-medium text-slate-900 dark:text-slate-100 transition-colors">{item.name}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="relative">
-                            <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-500 dark:text-slate-400 text-sm font-medium">₱</span>
-                            <input 
-                              id={`price-${item.id}`}
-                              type="number" min="0" step="0.01"
-                              value={localMaterials[item.id]?.price ?? ''} 
-                              onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], price: e.target.value}}))} 
-                              onBlur={(e) => handleMaterialSubmit(item.id, 'price', e.target.value)}
-                              className="w-full pl-7 pr-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm text-slate-900 dark:text-slate-100 transition-colors shadow-sm" 
-                            />
-                          </div>
-                        </td>
-                        <td className="px-6 py-4">
-                          <input 
-                            id={`qty-${item.id}`}
-                            type="number" min="0" 
-                            value={localMaterials[item.id]?.quantity ?? ''} 
-                            onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], quantity: e.target.value}}))} 
-                            onBlur={(e) => handleMaterialSubmit(item.id, 'quantity', e.target.value)}
-                            className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 text-sm text-slate-900 dark:text-slate-100 transition-colors shadow-sm" 
-                          />
-                        </td>
-                        <td className="px-6 py-4 text-right font-bold text-slate-700 dark:text-slate-300 transition-colors">
-                          ₱{totalCost.toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button onClick={() => handleDeleteMaterial(item.id)} className="text-slate-400 hover:text-red-500 transition-colors p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20" title="Delete Material">
-                            <Trash2 size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                <tbody className="divide-y">
+                  {materials.map((item) => (
+                    <tr key={item.id} className="hover:bg-slate-50/50">
+                      <td className="px-6 py-4 font-medium">{item.name}</td>
+                      <td className="px-6 py-4">
+                        <input id={`price-${item.id}`} type="number" value={localMaterials[item.id]?.price ?? ''} onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], price: e.target.value}}))} onBlur={(e) => handleMaterialSubmit(item.id, 'price', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                      </td>
+                      <td className="px-6 py-4">
+                        <input id={`qty-${item.id}`} type="number" value={localMaterials[item.id]?.quantity ?? ''} onChange={(e) => setLocalMaterials(prev => ({...prev, [item.id]: {...prev[item.id], quantity: e.target.value}}))} onBlur={(e) => handleMaterialSubmit(item.id, 'quantity', e.target.value)} className="w-full px-3 py-2 border rounded-lg text-sm" />
+                      </td>
+                      <td className="px-6 py-4 text-right font-bold">₱{(item.price * item.quantity).toLocaleString()}</td>
+                      <td className="px-6 py-4 text-right">
+                        <button onClick={() => deleteMaterial(item.id)} className="text-slate-400 hover:text-red-500 p-2"><Trash2 size={18} /></button>
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
-            
-            {/* Add New Material Form */}
-            <form onSubmit={handleAddMaterial} className="p-4 sm:p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 flex flex-col sm:flex-row gap-3 transition-colors">
-              <input type="text" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} placeholder="New material name" className="flex-1 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
-              <input type="number" min="0" step="0.01" value={newMaterialPrice} onChange={(e) => setNewMaterialPrice(e.target.value)} placeholder="Price (₱)" className="w-full sm:w-32 px-4 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 transition-colors text-slate-900 dark:text-slate-100" />
-              <button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-colors shadow-sm shadow-blue-600/20 whitespace-nowrap"><Plus size={16} /> Add Item</button>
+            <form onSubmit={handleAddMaterial} className="p-6 border-t bg-slate-50/50 flex flex-col sm:flex-row gap-3">
+              <input type="text" value={newMaterialName} onChange={(e) => setNewMaterialName(e.target.value)} placeholder="New material name" className="flex-1 px-4 py-2.5 bg-white border rounded-xl text-sm" />
+              <input type="number" value={newMaterialPrice} onChange={(e) => setNewMaterialPrice(e.target.value)} placeholder="Price (₱)" className="w-full sm:w-32 px-4 py-2.5 bg-white border rounded-xl text-sm" />
+              <button type="submit" className="bg-blue-600 text-white px-5 py-2.5 rounded-xl font-bold text-sm"><Plus size={16} /> Add Item</button>
             </form>
           </section>
         </div>
