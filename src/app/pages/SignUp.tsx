@@ -4,12 +4,14 @@ import { User, Hash, Mail, Lock, ArrowRight, ArrowLeft, MapPin, Calendar, BookOp
 import { motion, AnimatePresence } from "motion/react";
 import { ThemeToggle } from "../components/ThemeToggle";
 import { supabase } from "../../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
 
 export function SignUp() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { role?: string } | null;
   const role = state?.role || "student"; // Default to student
+  const { refreshProfile } = useAuth();
   const [step, setStep] = useState(1);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -102,6 +104,9 @@ export function SignUp() {
 
         if (profileError) throw profileError;
       }
+
+      // Force a refresh of the user profile so the app knows who they are before navigating
+      await refreshProfile();
 
       // After successful creation, route users to their respective onboarding screens
       navigate(role === "officer" ? "/create-block" : "/join-block", { state: { name: formData.fullName, position: formData.officerPosition } });
