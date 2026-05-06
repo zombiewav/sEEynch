@@ -97,10 +97,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { error } = await supabase
         .from('profiles')
-        .update({ class_id: null, role: 'student', officer_position: null })
+        .update({ class_id: null })
         .eq('id', user.id);
       if (error) throw error;
-      
+
       await refreshProfile();
     } catch (error) {
       console.error('Error leaving class:', error);

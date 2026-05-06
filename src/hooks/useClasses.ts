@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../app/contexts/AuthContext';
 
 export interface Class {
   id: string;
@@ -9,10 +10,18 @@ export interface Class {
 }
 
 export function useClasses() {
+  const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchClasses = useCallback(async () => {
+    // Guard: after leaveClass(), classId can be null; don't run queries that expect a class context.
+    if (!user?.classId) {
+      setClasses([]);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const { data, error } = await supabase
@@ -34,7 +43,7 @@ export function useClasses() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.classId]);
 
   useEffect(() => {
     fetchClasses();

@@ -88,9 +88,26 @@ export function useReceipts() {
     }
   };
 
-  const deleteReceipt = async (id: string) => { 
-    const { error } = await supabase.from('receipts').delete().eq('id', id); 
-    if (error) throw error; 
+  const deleteReceipt = async (id: string) => {
+    // Optimistic UI update
+    const previousReceipts = receipts;
+
+    setReceipts(prev => prev.filter(r => r.id !== id));
+
+    try {
+      const { error } = await supabase
+        .from('receipts')
+        .delete()
+        .eq('id', id);
+
+      if (error) {
+        // rollback if Supabase fails
+        setReceipts(previousReceipts);
+        throw error;
+      }
+    } catch (error) {
+      console.error('Error deleting receipt:', error);
+    }
   };
   
   const clearAllReceipts = async () => { 

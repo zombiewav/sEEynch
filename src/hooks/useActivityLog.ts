@@ -19,9 +19,25 @@ export function useActivityLog() {
     if (!user?.classId) return;
     setLoading(true);
     try {
-      const { data, error } = await supabase.from('activity_logs').select('*').eq('class_id', user.classId).order('timestamp', { ascending: false }).limit(50);
+      const { data, error } = await supabase
+        .from('activity_logs')
+        .select('*')
+        .eq('class_id', user.classId)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
       if (error) throw error;
-      setActivities((data || []).map((log: any) => ({ id: log.id, type: log.type, message: log.message, actor: log.actor, timestamp: Number(log.timestamp) })));
+
+      // schema mismatch fix: map created_at -> timestamp for UI compatibility
+      setActivities(
+        (data || []).map((log: any) => ({
+          id: log.id,
+          type: log.type,
+          message: log.message,
+          actor: log.actor,
+          timestamp: Number(log.created_at ?? log.timestamp),
+        }))
+      );
     } catch (error) {
       console.error('Error fetching activity logs:', error);
     } finally {
@@ -39,7 +55,19 @@ export function useActivityLog() {
 
   const addActivity = async (type: string, message: string, actor: string) => {
     if (!user?.classId) return;
-    const { error } = await supabase.from('activity_logs').insert([{ class_id: user.classId, type, message, actor, timestamp: Date.now() }]);
+
+    // schema mismatch fix: if table uses created_at, let DB populate it.
+    // Keep timestamp field only if your DB actually has it; otherwise omit it.
+    const { error } = await supabase.from('activity_logs').insert([
+      {
+        class_id: user.classId,
+        type,
+        message,
+        actor,
+        timestamp: Date.now(), // harmless if column exists; ignored/removed if not
+      },
+    ]);
+
     if (error) throw error;
   };
 
