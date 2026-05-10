@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useLocation } from "react-router";
 import { Wallet, ClipboardList, CalendarDays, Bell, Circle, CheckCircle2 } from "lucide-react";
 import { formatDistanceToNow } from 'date-fns';
@@ -33,6 +33,50 @@ export default function Dashboard() {
   const expenses = receipts.reduce((sum, r) => sum + r.amount, 0);
   const balance = collected - expenses;
   const unpaidCount = contributions.filter(c => c.status && c.status !== 'Paid').length;
+
+  // Strict minimal-scope persistence for "Next Event" (localStorage only)
+  const [eventName, setEventName] = useState<string>("Classroom Party");
+  const [eventDateISO, setEventDateISO] = useState<string>(""); // yyyy-mm-dd from <input type="date">
+
+  useEffect(() => {
+    try {
+      const savedName = window.localStorage.getItem("sEEync_event_name");
+      if (savedName && savedName.trim()) setEventName(savedName);
+
+      const savedDate = window.localStorage.getItem("sEEync_event_date");
+      if (savedDate) setEventDateISO(savedDate);
+    } catch (e) {
+      // ignore localStorage issues
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("sEEync_event_name", eventName);
+      window.localStorage.setItem("sEEync_event_date", eventDateISO);
+    } catch (e) {
+      // ignore localStorage issues
+    }
+  }, [eventName, eventDateISO]);
+
+  const eventDaysText = useMemo(() => {
+    if (!eventDateISO) return "Set event date";
+
+    // Parse yyyy-mm-dd in local time
+    const target = new Date(eventDateISO + "T00:00:00");
+    if (Number.isNaN(target.getTime())) return "Set event date";
+
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const diffMs = target.getTime() - startOfToday.getTime();
+    const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24));
+
+    if (diffDays === 0) return "Today";
+    if (diffDays > 0) return `In ${diffDays} days`;
+    return `${Math.abs(diffDays)} day${Math.abs(diffDays) === 1 ? "" : "s"} ago`;
+  }, [eventDateISO]);
+
+  const canEditNextEvent = user?.role === "officer" || user?.role === "Officer";
 
   return (
     <div className="p-6 md:p-8 space-y-8 max-w-7xl mx-auto animate-in fade-in duration-500">
@@ -95,12 +139,31 @@ export default function Dashboard() {
             <p className="text-xs font-bold text-gray-500 dark:text-slate-400 uppercase tracking-wider mb-1 transition-colors">
               Next Event
             </p>
-            <p className="text-3xl font-extrabold text-gray-900 dark:text-white transition-colors">
-              Classroom Party
-            </p>
+
+            {canEditNextEvent ? (
+              <div className="space-y-3">
+                <input
+                  value={eventName}
+                  onChange={(e) => setEventName(e.target.value)}
+                  placeholder="Event name"
+                  className="w-full text-3xl font-extrabold bg-transparent text-gray-900 dark:text-white outline-none border-b border-gray-200 dark:border-slate-700 focus:border-blue-500 transition-colors"
+                />
+                <input
+                  type="date"
+                  value={eventDateISO}
+                  onChange={(e) => setEventDateISO(e.target.value)}
+                  className="w-full text-sm text-gray-700 dark:text-slate-200 bg-transparent border border-gray-200 dark:border-slate-700 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:focus:ring-blue-400 transition-colors"
+                />
+              </div>
+            ) : (
+              <p className="text-3xl font-extrabold text-gray-900 dark:text-white transition-colors">
+                {eventName || "Classroom Party"}
+              </p>
+            )}
           </div>
+
           <p className="text-sm text-gray-500 dark:text-slate-400 mt-2 font-medium transition-colors">
-            In 4 days
+            {eventDaysText}
           </p>
         </div>
       </div>

@@ -29,8 +29,8 @@ export function useContributions() {
       const { data: profiles, error: profilesError } = await supabase
         .from('profiles')
         .select('full_name')
-        .eq('class_id', user.classId)
-        .eq('role', 'student');
+      .eq('class_id', user.classId)
+      .ilike('role', 'student');
 
       if (profilesError) throw profilesError;
 
@@ -112,7 +112,7 @@ export function useContributions() {
       .from('profiles')
       .select('full_name')
       .eq('class_id', user.classId)
-      .eq('role', 'student');
+      .ilike('role', 'student');
 
     if (profilesError) throw profilesError;
 
@@ -146,7 +146,9 @@ export function useContributions() {
       else if (amountPerStudent === 0 && amountPaid === 0) newStatus = 'Paid';
 
       return {
-        ...(existing ? { id: existing.id } : {}), // Include ID to properly upsert if it exists
+        // Normalize payload shape for Supabase upsert consistency:
+        // always include the same keys; ensure `id` is present (null when missing).
+        id: existing?.id ?? null,
         class_id: user.classId,
         student_name: student.full_name,
         amount_paid: amountPaid,

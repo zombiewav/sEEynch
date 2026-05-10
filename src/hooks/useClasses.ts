@@ -15,13 +15,6 @@ export function useClasses() {
   const [loading, setLoading] = useState(true);
 
   const fetchClasses = useCallback(async () => {
-    // Guard: after leaveClass(), classId can be null; don't run queries that expect a class context.
-    if (!user?.classId) {
-      setClasses([]);
-      setLoading(false);
-      return;
-    }
-
     setLoading(true);
     try {
       const { data, error } = await supabase

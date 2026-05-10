@@ -94,18 +94,51 @@ export default function EventDashboard() {
     }
   };
 
+  const [pendingMaterialUpdates, setPendingMaterialUpdates] = useState<Set<string>>(new Set());
+
+  const markPending = (key: string, pending: boolean) => {
+    setPendingMaterialUpdates(prev => {
+      const next = new Set(prev);
+      if (pending) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  };
+
+  const hasPendingMaterialUpdates = pendingMaterialUpdates.size > 0;
+
   const handleMaterialSubmit = async (id: string, field: 'price' | 'quantity', value: string) => {
     const numValue = parseFloat(value) || 0;
     const material = materials.find(m => m.id === id);
-    if (material && material[field] !== numValue) {
+
+    // No-op if no material or value didn't change
+    if (!material || material[field] === numValue) return;
+
+    const pendingKey = `${id}:${field}`;
+    markPending(pendingKey, true);
+
+    try {
       await updateMaterial(id, field, numValue);
+    } catch (error) {
+      console.error(`Failed to update material ${id} field ${field}:`, error);
+      // Revert-local state back to committed values would be ideal,
+      // but strict scope: keep current UX and rely on realtime/next fetch to update.
+    } finally {
+      markPending(pendingKey, false);
     }
   };
 
   const handleDisseminate = async () => {
+    if (hasPendingMaterialUpdates) {
+      window.alert("Please wait for material updates to finish saving before finalizing & disseminating.");
+      return;
+    }
+
     if (window.confirm("Are you sure? This will lock in the budget and update the required Ambagan for all students.")) {
       setIsDisseminating(true);
       try {
+        // grandTotal is derived from committed `materials` state
+        // and we block dissemination while any updateMaterial calls are pending.
         const amountPerStudent = await disseminateBudget(grandTotal);
         if (amountPerStudent !== undefined) {
           await addActivity('payment', `disseminated a budget of ₱${amountPerStudent} per student.`, user?.fullName || 'System');
