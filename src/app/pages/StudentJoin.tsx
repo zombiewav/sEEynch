@@ -31,6 +31,11 @@ export function StudentJoin() {
   const [isJoined, setIsJoined] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
+  // Separate direct join flow (keeps existing searchable list untouched)
+  const [isInviteOnlyModalOpen, setIsInviteOnlyModalOpen] = useState(false);
+  const [inviteCodeOnly, setInviteCodeOnly] = useState("");
+  const [inviteOnlyError, setInviteOnlyError] = useState("");
+
   const filteredClasses = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return classes;
@@ -95,6 +100,50 @@ export function StudentJoin() {
     }
   };
 
+  const handleJoinWithInviteOnly = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setInviteOnlyError("");
+
+    if (!user || !inviteCodeOnly.trim()) return;
+
+    try {
+      const normalizedCode = inviteCodeOnly.trim().toUpperCase();
+
+      const { data: classData, error: searchError } = await supabase
+        .from("classes")
+        .select("id, course_name, invite_code")
+        .eq("invite_code", normalizedCode)
+        .single();
+
+      if (searchError || !classData) {
+        throw new Error("Invalid invite code. Please check and try again.");
+      }
+
+      const { error: updateError } = await supabase
+        .from("profiles")
+        .update({ class_id: classData.id })
+        .eq("id", user.id);
+
+      if (updateError) throw updateError;
+
+      if (refreshProfile) await refreshProfile();
+
+      setIsJoined(true);
+      setSelectedClass(null);
+      setInviteCodeOnly("");
+      setIsInviteOnlyModalOpen(false);
+
+      setTimeout(() => {
+        navigate("/student", { state: { name: studentName } });
+      }, 2000);
+    } catch (error: any) {
+      console.error("Error joining with invite code:", error?.message || error);
+      setInviteOnlyError(
+        error?.message || "Failed to join class. Please try again."
+      );
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0f172a] flex flex-col items-center py-10 px-4 font-sans text-gray-900 dark:text-white relative overflow-x-hidden transition-colors">
       {/* Theme Toggle Top Right */}
@@ -150,6 +199,21 @@ export function StudentJoin() {
                   placeholder="Search by course or section (e.g. BSEE)..."
                   className="w-full pl-14 pr-6 py-4 bg-gray-100 dark:bg-slate-700 border-none rounded-2xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-400 text-lg shadow-sm"
                 />
+              </div>
+
+              {/* Separate invite-code join (does not remove existing class list) */}
+              <div className="flex items-center justify-center">
+                <button
+                  onClick={() => {
+                    setInviteOnlyError("");
+                    setInviteCodeOnly("");
+                    setIsInviteOnlyModalOpen(true);
+                  }}
+                  className="w-full py-3 px-6 mt-4 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg flex items-center justify-center gap-2"
+                >
+                  Join with Invite Code
+                  <ArrowRight size={20} />
+                </button>
               </div>
 
               {/* Class List */}
@@ -239,7 +303,7 @@ export function StudentJoin() {
         </AnimatePresence>
       </div>
 
-      {/* Invite Verification Modal */}
+      {/* Invite Verification Modals */}
       <AnimatePresence>
         {selectedClass && !isJoined && (
           <motion.div
@@ -295,6 +359,72 @@ export function StudentJoin() {
                 {errorMsg && (
                   <p className="text-xs text-red-500 font-medium -mt-3">
                     {errorMsg}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  className="w-full py-4 px-6 bg-orange-600 hover:bg-orange-500 text-white font-bold rounded-xl transition-colors shadow-lg shadow-orange-600/20 text-lg flex items-center justify-center gap-2"
+                >
+                  Verify & Join <ArrowRight size={20} />
+                </button>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {isInviteOnlyModalOpen && !isJoined && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 bg-gray-900/60 dark:bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 transition-colors"
+            onClick={() => setIsInviteOnlyModalOpen(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white dark:bg-slate-800 rounded-[2rem] shadow-2xl border border-gray-200 dark:border-slate-700 p-8 w-full max-w-md relative transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setIsInviteOnlyModalOpen(false)}
+                className="absolute top-6 right-6 text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-white transition-colors"
+              >
+                <X size={24} />
+              </button>
+
+              <div className="mb-8 pr-8">
+                <h3 className="text-2xl font-extrabold text-gray-900 dark:text-white mb-2">
+                  Join with Invite Code
+                </h3>
+                <p className="text-gray-500 dark:text-slate-400 text-sm">
+                  Enter your class invite code provided by your Class Officer.
+                </p>
+              </div>
+
+              <form onSubmit={handleJoinWithInviteOnly} className="space-y-6">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400 dark:text-slate-400">
+                    <ShieldCheck size={20} />
+                  </div>
+
+                  <input
+                    type="text"
+                    value={inviteCodeOnly}
+                    onChange={(e) =>
+                      setInviteCodeOnly(e.target.value.toUpperCase())
+                    }
+                    placeholder="Enter Code (e.g. BSEE-1B-XYZ)"
+                    className="w-full pl-12 pr-4 py-4 bg-gray-50 dark:bg-slate-900 border border-gray-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 transition-colors text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-slate-500 font-mono text-lg tracking-wider shadow-sm"
+                    required
+                  />
+                </div>
+
+                {inviteOnlyError && (
+                  <p className="text-xs text-red-500 font-medium -mt-3">
+                    {inviteOnlyError}
                   </p>
                 )}
 

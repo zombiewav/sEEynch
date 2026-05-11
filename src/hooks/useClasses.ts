@@ -19,7 +19,7 @@ export function useClasses() {
     try {
       const { data, error } = await supabase
         .from('classes')
-        .select('id, course_name, year_section, academic_year');
+        .select('id, course_name, year_section, invite_code');
 
       if (error) throw error;
 
@@ -27,7 +27,9 @@ export function useClasses() {
         id: c.id,
         name: `${c.course_name} ${c.year_section}`,
         course: c.course_name,
-        term: c.academic_year,
+        // The schema used elsewhere only writes course_name + year_section (+ invite_code).
+        // Use year_section as the "term" field to keep StudentJoin search/display working.
+        term: c.year_section,
       }));
       setClasses(formattedClasses);
     } catch (error) {
