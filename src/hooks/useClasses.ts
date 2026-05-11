@@ -21,19 +21,31 @@ export function useClasses() {
         .from('classes')
         .select('id, course_name, year_section, invite_code');
 
-      if (error) throw error;
+      if (error) {
+        // Log the actual Supabase error object (includes message/details/hint/code when available)
+        console.error('Error fetching classes (Supabase):', {
+          message: error.message,
+          details: (error as any).details,
+          hint: (error as any).hint,
+          code: (error as any).code,
+          status: (error as any).status,
+          cause: (error as any).cause,
+        });
+        throw error;
+      }
 
       const formattedClasses: Class[] = (data || []).map((c: any) => ({
-        id: c.id,
-        name: `${c.course_name} ${c.year_section}`,
-        course: c.course_name,
+        id: String(c.id),
+        name: `${c.course_name ?? ""} ${c.year_section ?? ""}`.trim(),
+        course: c.course_name ?? "",
         // The schema used elsewhere only writes course_name + year_section (+ invite_code).
         // Use year_section as the "term" field to keep StudentJoin search/display working.
-        term: c.year_section,
+        term: c.year_section ?? "",
       }));
+
       setClasses(formattedClasses);
     } catch (error) {
-      console.error("Error fetching classes:", error);
+      console.error('Error fetching classes (fatal):', error);
       setClasses([]);
     } finally {
       setLoading(false);

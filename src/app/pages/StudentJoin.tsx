@@ -41,7 +41,7 @@ export function StudentJoin() {
     if (!q) return classes;
 
     return classes.filter(
-      (c) =>
+      (c: Class) =>
         c.name.toLowerCase().includes(q) ||
         c.course.toLowerCase().includes(q) ||
         c.term.toLowerCase().includes(q)
@@ -231,7 +231,7 @@ export function StudentJoin() {
                     <p>No classes found matching "{searchQuery}".</p>
                   </div>
                 ) : (
-                  filteredClasses.map((cls) => (
+                  filteredClasses.map((cls: Class) => (
                     <div
                       key={cls.id}
                       className="bg-gray-50 dark:bg-slate-800 rounded-2xl p-5 border border-gray-200 dark:border-slate-700 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:border-orange-300 dark:hover:border-slate-600 transition-colors"
